@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/var/www/pphat/pphat.me
-Environment="PATH=/var/www/pphat/pphat.me/.venv/bin"
-ExecStart=/var/www/pphat/pphat.me/.venv/bin/python -m app.main
+WorkingDirectory=/var/www/pphat/pphat.me/kfesecuritybot
+Environment="PATH=/var/www/pphat/pphat.me/kfesecuritybot/.venv/bin"
+ExecStart=/var/www/pphat/pphat.me/kfesecuritybot/.venv/bin/python -m app.main
 Restart=always
 RestartSec=5
 

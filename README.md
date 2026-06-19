@@ -99,10 +99,10 @@ detected-bot/
 This project includes an automated deployment script for Ubuntu servers using native **Systemd** and **Nginx** (No Docker or PM2 required).
 
 ### Steps to Deploy
-1. Clone this repository into your target folder (default: `/var/www/pphat/pphat.me`):
+1. Clone this repository into your target folder (default: `/var/www/pphat/pphat.me/kfesecuritybot`):
    ```bash
-   git clone <repository-url> /var/www/pphat/pphat.me
-   cd /var/www/pphat/pphat.me
+   git clone <repository-url> /var/www/pphat/pphat.me/kfesecuritybot
+   cd /var/www/pphat/pphat.me/kfesecuritybot
    ```
 
 2. Configure your environment variables:
@@ -120,7 +120,7 @@ This project includes an automated deployment script for Ubuntu servers using na
 This script will automatically:
 - Install Python 3, Node.js (20.x), and Nginx.
 - Setup the Python Bot background service.
-- Build and start the Nuxt web dashboard on port 3000.
+- Build and start the Nuxt web dashboard on port 3105.
 - Setup an Nginx reverse proxy to expose the dashboard on port 80.
 
 ### Managing Services

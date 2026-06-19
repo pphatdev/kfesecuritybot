@@ -4,7 +4,7 @@
 
 set -e
 
-PROJECT_DIR="/var/www/pphat/pphat.me"
+PROJECT_DIR="/var/www/pphat/pphat.me/kfesecuritybot"
 
 echo "======================================"
 echo "Starting Ubuntu Deployment Setup..."

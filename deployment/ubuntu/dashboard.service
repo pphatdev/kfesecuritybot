@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/var/www/pphat/pphat.me/dashboard
-Environment="PORT=3000"
+WorkingDirectory=/var/www/pphat/pphat.me/kfesecuritybot/dashboard
+Environment="PORT=3105"
 Environment="NODE_ENV=production"
 ExecStart=/usr/bin/node .output/server/index.mjs
 Restart=always

@@ -8,13 +8,8 @@ def _bot_intro_html(user_mention: str) -> str:
         f"👋 Hi {user_mention}! I am a message moderation bot.\n\n"
         "🤖 <b>What I do:</b>\n"
         "I silently monitor messages and automatically <b>delete</b> Spam or Toxic content.\n\n"
-        "📌 <b>Admin Commands:</b>\n"
-        "• /addword toxic &lt;word&gt; — Add a toxic keyword\n"
-        "• /addword spam &lt;word&gt; — Add a spam keyword\n"
-        "• /removeword &lt;word&gt; — Remove a keyword\n"
-        "• /keywords — List all custom keywords\n\n"
         "💡 <b>How it works:</b>\n"
-        "Messages are instantly checked against a custom keyword list."
+        "Messages are instantly checked against a custom keyword list managed via the web dashboard."
     )
 
 
@@ -28,11 +23,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /help is issued."""
     await update.message.reply_html(
         "ℹ️ <b>Help</b>\n\n"
-        "I monitor group messages and remove harmful content automatically.\n\n"
-        "📌 <b>Admin Commands:</b>\n"
-        "• /addword toxic &lt;word&gt; — Add a toxic keyword\n"
-        "• /addword spam &lt;word&gt; — Add a spam keyword\n"
-        "• /removeword &lt;word&gt; — Remove a keyword\n"
-        "• /keywords — List all custom keywords\n\n"
+        "I monitor group messages and remove harmful content automatically based on patterns configured in the web dashboard.\n\n"
         "For more details, type /start."
     )

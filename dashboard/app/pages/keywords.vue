@@ -162,9 +162,8 @@ async function deleteKeyword(word, category) {
   if (!confirm(`Are you sure you want to remove "${word}" from the ${category} list?`)) return
   
   try {
-    await $fetch('/api/keywords', {
-      method: 'DELETE',
-      body: { word, category }
+    await $fetch(`/api/keywords?word=${encodeURIComponent(word)}&category=${encodeURIComponent(category)}`, {
+      method: 'DELETE'
     })
     await refresh()
   } catch (err) {

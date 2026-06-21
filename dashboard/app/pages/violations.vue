@@ -145,9 +145,8 @@ async function resetStrikes(userId, username) {
   if (!confirm(`Are you sure you want to clear all violation strikes for @${username}?`)) return
   
   try {
-    await $fetch('/api/violations', {
-      method: 'DELETE',
-      body: { userId }
+    await $fetch(`/api/violations?userId=${userId}`, {
+      method: 'DELETE'
     })
     await refresh()
   } catch (err) {

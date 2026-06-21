@@ -4,8 +4,9 @@ import path from 'node:path'
 export default defineEventHandler(async (event) => {
   verifySession(event)
   try {
-    const body = await readBody(event)
-    const { word, category } = body
+    const query = getQuery(event)
+    const word = query.word as string
+    const category = query.category as string
     
     if (!word || !category) {
       throw createError({ statusCode: 400, statusMessage: 'Word and category are required' })

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 export default defineEventHandler((event) => {
+  verifySession(event)
   try {
     // Path to the python bot's keywords json file
     const filePath = path.resolve(process.cwd(), '../data/custom_keywords.json')

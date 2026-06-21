@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 export default defineEventHandler(async (event) => {
+  verifySession(event)
   try {
     const body = await readBody(event)
     const { userId } = body

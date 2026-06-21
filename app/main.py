@@ -16,7 +16,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from app.config import config
 from app.handlers.commands import start_command, help_command
 from app.handlers.messages import handle_message
-from app.handlers.admin import addword_command, removeword_command, listkeywords_command
+from app.handlers.admin import addword_command, removeword_command, listkeywords_command, login_command, adduser_command, removeuser_command
 
 # Enable logging
 logging.basicConfig(
@@ -44,6 +44,9 @@ def main() -> None:
     application.add_handler(CommandHandler("addword", addword_command))
     application.add_handler(CommandHandler("removeword", removeword_command))
     application.add_handler(CommandHandler("keywords", listkeywords_command))
+    application.add_handler(CommandHandler("login", login_command))
+    application.add_handler(CommandHandler("adduser", adduser_command))
+    application.add_handler(CommandHandler("removeuser", removeuser_command))
 
     # Message handlers — handle_message also handles mention replies internally
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))

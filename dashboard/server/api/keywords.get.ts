@@ -18,7 +18,19 @@ export default defineEventHandler((event) => {
     }
     
     const fileData = fs.readFileSync(filePath, 'utf-8')
-    return JSON.parse(fileData)
+    const parsedData = JSON.parse(fileData)
+    
+    // Normalize pattern array to objects for the UI
+    if (parsedData.pattern && Array.isArray(parsedData.pattern)) {
+      parsedData.pattern = parsedData.pattern.map((p: any) => {
+        if (typeof p === 'string') {
+          return { word: p, response: '' }
+        }
+        return p
+      })
+    }
+    
+    return parsedData
   } catch (error) {
     console.error('Error reading keywords:', error)
     throw createError({

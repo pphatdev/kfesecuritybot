@@ -21,7 +21,11 @@ export default defineEventHandler(async (event) => {
     const data = JSON.parse(fileData)
     
     if (data[category]) {
-      data[category] = data[category].filter((w: string) => w !== word)
+      if (category === 'pattern') {
+        data[category] = data[category].filter((w: any) => (typeof w === 'string' ? w : w.word) !== word)
+      } else {
+        data[category] = data[category].filter((w: string) => w !== word)
+      }
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
       return { success: true, message: `Removed '${word}' from ${category}` }
     } else {

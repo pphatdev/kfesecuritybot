@@ -62,6 +62,18 @@
           </select>
         </div>
         
+        <div class="w-full md:w-auto" v-if="newCategory === 'pattern'">
+          <label for="response-input" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider mb-2">Custom Response (Optional)</label>
+          <input
+            type="text"
+            id="response-input"
+            v-model="newResponse"
+            class="block w-full px-3 py-2.5 border border-(--border-color) rounded-lg text-sm bg-(--bg-card) text-(--text-body) focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
+            placeholder="e.g. No links allowed!"
+            @keyup.enter="addKeyword"
+          />
+        </div>
+        
         <div class="w-full md:w-auto">
           <button 
             @click="addKeyword" 
@@ -224,21 +236,26 @@
             <p class="text-sm">No matching regex patterns found.</p>
           </div>
           
-          <TransitionGroup name="tag" tag="div" class="flex flex-wrap gap-3" v-else>
-            <span 
-              v-for="word in filteredPattern" 
-              :key="word"
-              class="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg text-sm font-medium font-mono border border-blue-500/30 bg-blue-500/10 text-blue-500 shadow-sm hover:shadow-md transition-shadow group"
+          <TransitionGroup name="tag" tag="div" class="flex flex-col gap-3" v-else>
+            <div 
+              v-for="p in filteredPattern" 
+              :key="p.word"
+              class="flex flex-col gap-2 p-3 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-500 shadow-sm transition-shadow group"
             >
-              <span class="select-all">{{ word }}</span>
-              <button 
-                @click="deleteKeyword(word, 'pattern')" 
-                class="p-0.5 rounded-md text-blue-500/70 hover:text-blue-500 hover:bg-blue-500/20 transition-colors"
-                title="Delete pattern"
-              >
-                <IconX class="w-4 h-4" />
-              </button>
-            </span>
+              <div class="flex items-center justify-between gap-3">
+                <span class="font-mono text-sm select-all">{{ p.word }}</span>
+                <button 
+                  @click="deleteKeyword(p.word, 'pattern')" 
+                  class="p-1 rounded-md text-blue-500/70 hover:text-blue-500 hover:bg-blue-500/20 transition-colors flex-shrink-0"
+                  title="Delete pattern"
+                >
+                  <IconX class="w-4 h-4" />
+                </button>
+              </div>
+              <div v-if="p.response" class="text-xs text-blue-500/80 italic border-t border-blue-500/20 pt-2">
+                Response: {{ p.response }}
+              </div>
+            </div>
           </TransitionGroup>
         </div>
       </div>
@@ -260,6 +277,7 @@ const { data: keywords, pending, refresh } = useFetch('/api/keywords')
 const showAddForm = ref(false)
 const newWord = ref('')
 const newCategory = ref('spam')
+const newResponse = ref('')
 const searchQuery = ref('')
 const activeTab = ref('spam')
 
@@ -278,7 +296,10 @@ const filteredToxic = computed(() => {
 const filteredPattern = computed(() => {
   if (!keywords.value?.pattern) return []
   if (!searchQuery.value) return keywords.value.pattern
-  return keywords.value.pattern.filter(word => word.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  return keywords.value.pattern.filter(p => {
+    const wordStr = typeof p === 'string' ? p : p.word
+    return wordStr.toLowerCase().includes(searchQuery.value.toLowerCase())
+  })
 })
 
 async function addKeyword() {
@@ -287,10 +308,15 @@ async function addKeyword() {
   try {
     await $fetch('/api/keywords', {
       method: 'POST',
-      body: { word: newWord.value, category: newCategory.value }
+      body: { 
+        word: newWord.value, 
+        category: newCategory.value,
+        response: newCategory.value === 'pattern' ? newResponse.value.trim() : undefined
+      }
     })
     activeTab.value = newCategory.value
     newWord.value = ''
+    newResponse.value = ''
     showAddForm.value = false
     await refresh()
   } catch (err) {

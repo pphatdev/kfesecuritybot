@@ -61,15 +61,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pre_result = pre_check(text)
 
     if pre_result:
-        logger.info(f"Keyword matched: {pre_result} — deleting message")
+        match_type, custom_reason = pre_result if isinstance(pre_result, tuple) else (pre_result, None)
+        logger.info(f"Keyword matched: {match_type} — deleting message")
         
         # Categorize based on the result from pre_check
-        if pre_result == "Toxic":
+        if match_type == "Toxic":
             category = "toxic"
             display_reason = "Toxic Content"
-        elif pre_result == "Pattern":
+        elif match_type == "Pattern":
             category = "spam"
-            display_reason = "Sensitive pattern or restricted content detected"
+            display_reason = custom_reason or "Sensitive pattern or restricted content detected"
         else:
             # Both "Spam" and "Pattern" map to the "spam" category for strike tracking
             category = "spam"

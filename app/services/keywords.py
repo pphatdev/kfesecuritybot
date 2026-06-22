@@ -77,13 +77,21 @@ def _save(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def add_keyword(word: str, category: str) -> bool:
+def add_keyword(word: str, category: str, response: str = "") -> bool:
     """Add a keyword. Returns True if added, False if already exists."""
     word = word.strip() if category == "pattern" else word.strip().lower()
     data = _load_all()
-    if word in data.get(category, []):
-        return False
-    data[category].append(word)
+    
+    if category == "pattern":
+        exists = any(item.get("word") == word if isinstance(item, dict) else item == word for item in data.get("pattern", []))
+        if exists:
+            return False
+        data["pattern"].append({"word": word, "response": response})
+    else:
+        if word in data.get(category, []):
+            return False
+        data[category].append(word)
+        
     _save(data)
     logger.info(f"Added {category} keyword: {word}")
     return True
@@ -94,12 +102,23 @@ def remove_keyword(word: str) -> bool:
     word = word.strip()
     data = _load_all()
     removed = False
-    for cat in ("spam", "toxic", "pattern"):
-        # Match case-sensitive for pattern, case-insensitive for others
-        target_word = word if cat == "pattern" else word.lower()
+    
+    for cat in ("spam", "toxic"):
+        target_word = word.lower()
         if target_word in data.get(cat, []):
             data[cat].remove(target_word)
             removed = True
+            
+    # Handle pattern category which might contain dictionaries
+    if "pattern" in data:
+        original_len = len(data["pattern"])
+        data["pattern"] = [
+            item for item in data["pattern"]
+            if (item.get("word") if isinstance(item, dict) else item) != word
+        ]
+        if len(data["pattern"]) < original_len:
+            removed = True
+
     if removed:
         _save(data)
         logger.info(f"Removed keyword: {word}")
@@ -111,27 +130,36 @@ def get_custom_keywords() -> dict:
     return _load_all()
 
 
-def pre_check(text: str) -> str | None:
+def pre_check(text: str) -> tuple[str, str | None] | None:
     """
     Check text against keyword lists.
     All keywords are read from the JSON file on every call — no restart needed.
-    Returns 'Spam', 'Toxic', or None.
+    Returns ('Spam', None), ('Toxic', None), ('Pattern', custom_response) or None.
     """
     lower = text.lower()
     data = _load_all()
 
     for kw in data.get("spam", []):
         if kw.lower() in lower:
-            return "Spam"
+            return ("Spam", None)
 
     for kw in data.get("toxic", []):
         if kw.lower() in lower:
-            return "Toxic"
+            return ("Toxic", None)
 
-    for pat in data.get("pattern", []):
+    for item in data.get("pattern", []):
+        if isinstance(item, dict):
+            pat = item.get("word", "")
+            response = item.get("response", None)
+            if not response:
+                response = None
+        else:
+            pat = item
+            response = None
+            
         try:
             if re.search(pat, text, re.IGNORECASE):
-                return "Pattern"
+                return ("Pattern", response)
         except re.error as e:
             logger.warning(f"Invalid regex pattern '{pat}': {e}")
             continue

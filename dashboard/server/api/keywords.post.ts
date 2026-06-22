@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   verifySession(event)
   try {
     const body = await readBody(event)
-    const { word, category } = body
+    const { word, category, response } = body
     
     if (!word || !category) {
       throw createError({ statusCode: 400, statusMessage: 'Word and category are required' })
@@ -21,13 +21,24 @@ export default defineEventHandler(async (event) => {
     if (!data.pattern) data.pattern = []
     
     if (data[category]) {
-      const lowerWord = category === 'pattern' ? word.trim() : word.trim().toLowerCase()
-      if (data[category].includes(lowerWord)) {
-        throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
+      if (category === 'pattern') {
+        const lowerWord = word.trim()
+        const exists = data.pattern.some((p: any) => (typeof p === 'string' ? p : p.word) === lowerWord)
+        if (exists) {
+          throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
+        }
+        data.pattern.push({ word: lowerWord, response: response || '' })
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+        return { success: true, message: `Added '${lowerWord}' to ${category}` }
+      } else {
+        const lowerWord = word.trim().toLowerCase()
+        if (data[category].includes(lowerWord)) {
+          throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
+        }
+        data[category].push(lowerWord)
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+        return { success: true, message: `Added '${lowerWord}' to ${category}` }
       }
-      data[category].push(lowerWord)
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      return { success: true, message: `Added '${lowerWord}' to ${category}` }
     } else {
       throw createError({ statusCode: 400, statusMessage: 'Invalid category' })
     }

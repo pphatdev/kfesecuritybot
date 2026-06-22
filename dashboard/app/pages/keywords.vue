@@ -1,125 +1,204 @@
 <template>
-  <div class="keywords-manager">
+  <div class="flex flex-col gap-6">
     <!-- Top Action Bar -->
-    <div class="actions-bar glass-panel">
-      <div class="search-box">
-        <IconSearch class="icon search-icon" />
-        <input type="text" v-model="searchQuery" placeholder="Search blocked keywords..." />
+    <div class="glass-card rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="relative w-full sm:w-96">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <IconSearch class="h-5 w-5 text-[var(--text-muted)]" />
+        </div>
+        <input 
+          type="text" 
+          v-model="searchQuery" 
+          class="block w-full pl-10 pr-3 py-2 border border-[var(--border-color)] rounded-lg leading-5 bg-[var(--bg-card)] text-[var(--text-body)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] sm:text-sm transition-colors" 
+          placeholder="Search blocked keywords..." 
+        />
       </div>
-      <button class="btn btn-primary" @click="showAddForm = !showAddForm">
-        <template v-if="showAddForm">Close Editor</template>
+      
+      <button 
+        @click="showAddForm = !showAddForm"
+        class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[var(--color-primary)] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)] transition-colors"
+      >
+        <template v-if="showAddForm">
+          <IconX class="h-4 w-4" />
+          Close Editor
+        </template>
         <template v-else>
-          <IconPlus class="icon" />
+          <IconPlus class="h-4 w-4" />
           Add Blockword
         </template>
       </button>
     </div>
 
     <!-- Collapsible Add Keyword Form -->
-    <div class="add-form glass-panel" v-if="showAddForm">
-      <div class="form-title">
-        <h3>Create Blocked Keyword</h3>
-        <p>Define a new word or pattern to match and instantly delete.</p>
+    <div v-if="showAddForm" class="glass-card rounded-xl p-6 transition-all duration-300 transform origin-top animate-in slide-in-from-top-4 fade-in">
+      <div class="mb-5 border-b border-[var(--border-color)] pb-4">
+        <h3 class="text-lg font-semibold text-[var(--text-heading)]">Create Blocked Keyword</h3>
+        <p class="text-sm text-[var(--text-muted)] mt-1">Define a new word or pattern to match and instantly delete.</p>
       </div>
       
-      <div class="form-row">
-        <div class="form-group flex-2">
-          <label for="keyword-input">Keyword / Pattern</label>
+      <div class="flex flex-col md:flex-row gap-4 items-end">
+        <div class="flex-1 w-full">
+          <label for="keyword-input" class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Keyword / Pattern</label>
           <input
             type="text"
             id="keyword-input"
             v-model="newWord"
+            class="block w-full px-3 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-card)] text-[var(--text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-colors"
             placeholder="e.g. crypto, free money..."
             @keyup.enter="addKeyword"
           />
         </div>
-        <div class="form-group flex-1">
-          <label for="category-select">Category</label>
-          <select id="category-select" v-model="newCategory">
+        
+        <div class="w-full md:w-64">
+          <label for="category-select" class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Category</label>
+          <select 
+            id="category-select" 
+            v-model="newCategory"
+            class="block w-full px-3 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-card)] text-[var(--text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-colors appearance-none"
+          >
             <option value="spam">Spam / Promo</option>
             <option value="toxic">Toxic / Profanity</option>
           </select>
         </div>
-        <div class="form-actions">
-          <button class="btn btn-save" @click="addKeyword" :disabled="!newWord.trim()">
+        
+        <div class="w-full md:w-auto">
+          <button 
+            @click="addKeyword" 
+            :disabled="!newWord.trim()"
+            class="w-full flex items-center justify-center gap-2 px-6 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[var(--color-success)] hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
             <span>Save Pattern</span>
-            <IconDeviceFloppy class="icon" />
+            <IconDeviceFloppy class="h-4 w-4" />
           </button>
         </div>
       </div>
     </div>
     
     <!-- Tab Bar Selector -->
-    <div class="tab-bar" v-if="!pending">
-      <button :class="['tab-btn', { active: activeTab === 'spam' }]" @click="activeTab = 'spam'">
-        <IconBan class="icon tab-icon" />
-        <span class="tab-label">Spam Patterns</span>
-        <span class="tab-count">{{ keywords?.spam?.length || 0 }}</span>
+    <div v-if="!pending" class="flex flex-wrap gap-2 p-1.5 bg-slate-500/5 rounded-xl border border-[var(--border-color)] w-fit">
+      <button 
+        @click="activeTab = 'spam'"
+        :class="[
+          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          activeTab === 'spam' 
+            ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+            : 'text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-slate-500/10'
+        ]"
+      >
+        <IconBan class="w-4 h-4" />
+        <span>Spam Patterns</span>
+        <span :class="[
+          'px-2 py-0.5 rounded-full text-xs font-semibold',
+          activeTab === 'spam' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-[var(--text-muted)]'
+        ]">
+          {{ keywords?.spam?.length || 0 }}
+        </span>
       </button>
-      <button :class="['tab-btn', { active: activeTab === 'toxic' }]" @click="activeTab = 'toxic'">
-        <IconShieldX class="icon tab-icon" />
-        <span class="tab-label">Toxic Patterns</span>
-        <span class="tab-count">{{ keywords?.toxic?.length || 0 }}</span>
+      
+      <button 
+        @click="activeTab = 'toxic'"
+        :class="[
+          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          activeTab === 'toxic' 
+            ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+            : 'text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-slate-500/10'
+        ]"
+      >
+        <IconShieldX class="w-4 h-4" />
+        <span>Toxic Patterns</span>
+        <span :class="[
+          'px-2 py-0.5 rounded-full text-xs font-semibold',
+          activeTab === 'toxic' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-[var(--text-muted)]'
+        ]">
+          {{ keywords?.toxic?.length || 0 }}
+        </span>
       </button>
     </div>
 
     <!-- Active Tab Panel Container -->
-    <div class="tab-panel" v-if="!pending">
+    <div v-if="!pending" class="glass-card rounded-xl overflow-hidden min-h-[400px] flex flex-col">
+      
       <!-- Spam Keywords Tab -->
-      <div class="category-card" v-if="activeTab === 'spam'">
-        <div class="category-header">
-          <div class="header-title">
-            <h3>Spam Detection Filter</h3>
-            <p class="subtitle">These pattern matches trigger automatic deletion to filter promos and spam scripts.</p>
-          </div>
+      <div v-if="activeTab === 'spam'" class="flex flex-col h-full animate-in fade-in duration-300">
+        <div class="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+          <h3 class="text-[15px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-[var(--color-warning)]"></span>
+            Spam Detection Filter
+          </h3>
+          <p class="text-[13px] text-[var(--text-muted)] mt-1">These pattern matches trigger automatic deletion to filter promos and spam scripts.</p>
         </div>
         
-        <div class="category-body">
-          <div v-if="!filteredSpam.length" class="empty-list">
-            No matching spam keywords found.
+        <div class="p-6 flex-1 bg-slate-500/5">
+          <div v-if="!filteredSpam.length" class="flex flex-col items-center justify-center h-48 text-[var(--text-muted)]">
+            <IconBan class="w-12 h-12 mb-3 opacity-20" />
+            <p class="text-sm">No matching spam keywords found.</p>
           </div>
-          <TransitionGroup name="tag" tag="div" class="tag-cloud" v-else>
-            <span class="tag-pill spam-tag" v-for="word in filteredSpam" :key="word">
-              <span class="tag-text">{{ word }}</span>
-              <button class="tag-delete" @click="deleteKeyword(word, 'spam')" title="Delete pattern">×</button>
+          
+          <TransitionGroup name="tag" tag="div" class="flex flex-wrap gap-3" v-else>
+            <span 
+              v-for="word in filteredSpam" 
+              :key="word"
+              class="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg text-sm font-medium font-mono border border-amber-500/30 bg-amber-500/10 text-amber-500 shadow-sm hover:shadow-md transition-shadow group"
+            >
+              <span class="select-all">{{ word }}</span>
+              <button 
+                @click="deleteKeyword(word, 'spam')" 
+                class="p-0.5 rounded-md text-amber-500/70 hover:text-amber-500 hover:bg-amber-500/20 transition-colors"
+                title="Delete pattern"
+              >
+                <IconX class="w-4 h-4" />
+              </button>
             </span>
           </TransitionGroup>
         </div>
       </div>
 
       <!-- Toxic Keywords Tab -->
-      <div class="category-card" v-if="activeTab === 'toxic'">
-        <div class="category-header">
-          <div class="header-title">
-            <h3>Toxic & Profanity Filter</h3>
-            <p class="subtitle">These patterns match harmful, abusive, or highly toxic language and trigger immediate strike allocation.</p>
-          </div>
+      <div v-if="activeTab === 'toxic'" class="flex flex-col h-full animate-in fade-in duration-300">
+        <div class="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+          <h3 class="text-[15px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-[var(--color-danger)]"></span>
+            Toxic & Profanity Filter
+          </h3>
+          <p class="text-[13px] text-[var(--text-muted)] mt-1">These patterns match harmful, abusive, or highly toxic language and trigger immediate strike allocation.</p>
         </div>
         
-        <div class="category-body">
-          <div v-if="!filteredToxic.length" class="empty-list">
-            No matching toxic keywords found.
+        <div class="p-6 flex-1 bg-slate-500/5">
+          <div v-if="!filteredToxic.length" class="flex flex-col items-center justify-center h-48 text-[var(--text-muted)]">
+            <IconShieldX class="w-12 h-12 mb-3 opacity-20" />
+            <p class="text-sm">No matching toxic keywords found.</p>
           </div>
-          <TransitionGroup name="tag" tag="div" class="tag-cloud" v-else>
-            <span class="tag-pill toxic-tag" v-for="word in filteredToxic" :key="word">
-              <span class="tag-text">{{ word }}</span>
-              <button class="tag-delete" @click="deleteKeyword(word, 'toxic')" title="Delete pattern">×</button>
+          
+          <TransitionGroup name="tag" tag="div" class="flex flex-wrap gap-3" v-else>
+            <span 
+              v-for="word in filteredToxic" 
+              :key="word"
+              class="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg text-sm font-medium font-mono border border-red-500/30 bg-red-500/10 text-red-500 shadow-sm hover:shadow-md transition-shadow group"
+            >
+              <span class="select-all">{{ word }}</span>
+              <button 
+                @click="deleteKeyword(word, 'toxic')" 
+                class="p-0.5 rounded-md text-red-500/70 hover:text-red-500 hover:bg-red-500/20 transition-colors"
+                title="Delete pattern"
+              >
+                <IconX class="w-4 h-4" />
+              </button>
             </span>
           </TransitionGroup>
         </div>
       </div>
     </div>
     
-    <div class="loading-state glass-panel" v-else>
-      <span class="spinner"></span>
-      <p>Synchronizing blocklists...</p>
+    <div v-else class="glass-card rounded-xl min-h-[400px] flex flex-col items-center justify-center gap-4 text-[var(--text-muted)]">
+      <div class="w-8 h-8 border-4 border-slate-500/20 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+      <p class="text-sm font-medium">Synchronizing blocklists...</p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { IconSearch, IconPlus, IconDeviceFloppy, IconBan, IconShieldX } from '@tabler/icons-vue'
+import { IconSearch, IconPlus, IconX, IconDeviceFloppy, IconBan, IconShieldX } from '@tabler/icons-vue'
 
 const { data: keywords, pending, refresh } = useFetch('/api/keywords')
 
@@ -173,355 +252,13 @@ async function deleteKeyword(word, category) {
 </script>
 
 <style scoped>
-.keywords-manager {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.actions-bar {
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 8px 16px;
-  flex: 1;
-  max-width: 400px;
-  transition: var(--transition-smooth);
-}
-
-.search-box:focus-within {
-  border-color: var(--color-active);
-  background: rgba(0, 0, 0, 0.5);
-  box-shadow: 0 0 0 3px rgba(229, 143, 36, 0.15);
-}
-
-.search-icon {
-  font-size: 1.1rem;
-  opacity: 0.6;
-}
-
-.search-box input {
-  border: none;
-  background: transparent;
-  width: 100%;
-  font-family: inherit;
-  font-size: 0.95rem;
-  color: var(--color-text-body);
-  outline: none;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border: none;
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition-smooth);
-  font-family: inherit;
-  font-size: 0.95rem;
-}
-
-.btn-primary {
-  background: var(--color-primary) !important;
-  color: var(--color-bg-app) !important;
-  box-shadow: 0 4px 15px rgba(229, 143, 36, 0.2);
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-light) !important;
-  transform: translateY(-1px);
-}
-
-.btn-save {
-  background: var(--color-secondary) !important;
-  color: var(--color-bg-app) !important;
-  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
-  padding: 12px 24px;
-}
-
-.btn-save:hover {
-  background: var(--color-secondary-light) !important;
-}
-
-.btn-save:disabled {
-  background-color: var(--color-disabled-bg) !important;
-  color: var(--color-disabled-text) !important;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-.add-form {
-  padding: 24px;
-  animation: slideDown 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.form-title {
-  margin-bottom: 24px;
-}
-
-.form-title h3 {
-  margin: 0 0 4px 0;
-  font-size: 1.15rem;
-  color: var(--color-primary);
-}
-
-.form-title p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--color-text-light);
-}
-
-.form-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.flex-2 { flex: 2; min-width: 240px; }
-.flex-1 { flex: 1; min-width: 160px; }
-
-.form-group label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--color-text-light);
-  letter-spacing: 0.05em;
-}
-
-.form-group input, .form-group select {
-  padding: 12px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-family: inherit;
-  font-size: 0.95rem;
-  background-color: rgba(0, 0, 0, 0.3);
-  color: var(--color-text-body);
-  outline: none;
-  transition: var(--transition-smooth);
-}
-
-.form-group input:focus, .form-group select:focus {
-  border-color: var(--color-active);
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-.form-actions {
-  display: flex;
-  align-items: flex-end;
-}
-
-.tab-bar {
-  display: inline-flex;
-  gap: 4px;
-  background-color: rgba(0, 0, 0, 0.3);
-  padding: 6px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-}
-
-.tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 24px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-text-light);
-  cursor: pointer;
-  transition: var(--transition-smooth);
-}
-
-.tab-btn:hover {
-  color: var(--color-text-white);
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.tab-btn.active {
-  color: #FFFFFF !important;
-  background-color: var(--color-primary);
-  box-shadow: 0 4px 15px rgba(229, 143, 36, 0.3);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.tab-count {
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: var(--radius-lg);
-  background-color: rgba(255, 255, 255, 0.1);
-  color: var(--color-text-light);
-  font-weight: 600;
-}
-
-.tab-btn.active .tab-count {
-  background-color: rgba(0, 0, 0, 0.25);
-  color: #FFFFFF;
-}
-
-.tab-panel {
-  background-color: var(--color-bg-surface) !important;
-  backdrop-filter: var(--glass-backdrop);
-  -webkit-backdrop-filter: var(--glass-backdrop);
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-  transition: var(--transition-smooth);
-}
-
-.category-card {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.category-header {
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 18px;
-}
-
-.category-header h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.category-body {
-  flex: 1;
-}
-
-.empty-list {
-  padding: 24px 0;
-  color: var(--color-text-light);
-  font-size: 0.9rem;
-}
-
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.tag-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  font-weight: 600;
-  font-family: monospace;
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition-smooth);
-}
-
-.tag-pill:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.spam-tag {
-  background-color: rgba(249, 115, 22, 0.15);
-  color: #FDBA74;
-  border: 1px solid rgba(249, 115, 22, 0.3);
-}
-
-.toxic-tag {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #FCA5A5;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.tag-text {
-  user-select: all;
-}
-
-.tag-delete {
-  background: none;
-  border: none;
-  color: inherit;
-  font-size: 1.1rem;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0;
-  opacity: 0.5;
-  transition: var(--transition-smooth);
-}
-
-.tag-delete:hover {
-  opacity: 1;
-  transform: scale(1.2);
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px;
-  gap: 16px;
-  color: var(--color-text-light);
-}
-
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--color-border);
-  border-radius: 50%;
-  border-top-color: var(--color-primary);
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Animations */
 .tag-enter-active,
 .tag-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tag-enter-from,
 .tag-leave-to {
   opacity: 0;
-  transform: scale(0.85);
+  transform: scale(0.9) translateY(10px);
 }
 </style>

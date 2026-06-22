@@ -1,79 +1,97 @@
 <template>
-  <div class="violations-view">
-    <div class="card glass-panel">
+  <div class="flex flex-col gap-6">
+    <div class="glass-card rounded-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
       <!-- Header -->
-      <div class="card-header">
-        <div class="title-wrap">
-          <h2>
-            <IconAlertTriangle class="icon header-icon" />
+      <div class="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 class="text-[16px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
+            <IconAlertTriangle class="w-5 h-5 text-[var(--color-warning)]" />
             User Strike Tracking
           </h2>
-          <p class="subtitle">Moderation record. Users with 4+ strikes trigger the public warning callout.</p>
+          <p class="text-[13px] text-[var(--text-muted)] mt-1">Moderation record. Users with 4+ strikes trigger the public warning callout.</p>
         </div>
-        <span class="status-indicator" :class="{ scanning: !pending }">
-          <span class="dot"></span>
-          {{ pending ? 'Syncing...' : 'Live Monitoring' }}
-        </span>
+        
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/5 border border-[var(--border-color)]">
+          <span class="relative flex h-2 w-2">
+            <span v-if="!pending" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2" :class="pending ? 'bg-[var(--text-muted)]' : 'bg-[var(--color-success)]'"></span>
+          </span>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            {{ pending ? 'Syncing...' : 'Live Monitoring' }}
+          </span>
+        </div>
       </div>
       
       <!-- Content -->
-      <div class="card-body">
-        <div v-if="!stats || !Object.keys(stats.violations || {}).length" class="empty-state">
-          <IconShield class="icon empty-icon" />
-          <p>No user violations recorded. Chat members are behaving well!</p>
+      <div class="bg-[var(--bg-card)]">
+        <div v-if="!stats || !Object.keys(stats.violations || {}).length" class="flex flex-col items-center justify-center py-20 text-[var(--text-muted)]">
+          <IconShield class="w-16 h-16 mb-4 opacity-20" />
+          <p class="text-sm font-medium">No user violations recorded. Chat members are behaving well!</p>
         </div>
         
-        <div class="table-container" v-else>
-          <table class="data-table">
+        <div class="w-full overflow-x-auto" v-else>
+          <table class="w-full text-left border-collapse">
             <thead>
-              <tr>
-                <th>User / Identity</th>
-                <th>Strikes Logged</th>
-                <th>Threat Level</th>
-                <th>Last Violation Time</th>
-                <th class="text-right">Actions</th>
+              <tr class="bg-slate-500/5 border-b border-[var(--border-color)]">
+                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">User / Identity</th>
+                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">Strikes Logged</th>
+                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">Threat Level</th>
+                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">Last Violation Time</th>
+                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="(vData, userId) in stats.violations" :key="userId" :class="getRowClass(vData.strikes)">
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr v-for="(vData, userId) in stats.violations" :key="userId" 
+                  class="transition-colors hover:bg-slate-500/5 group"
+                  :class="getRowClass(vData.strikes)">
+                
                 <!-- User Profile -->
-                <td>
-                  <div class="user-info">
-                    <div class="avatar" :style="getAvatarStyle(vData.username)">
+                <td class="py-4 px-6 whitespace-nowrap">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0" :style="getAvatarStyle(vData.username)">
                       {{ vData.username.substring(0, 2).toUpperCase() }}
                     </div>
-                    <div class="user-meta">
-                      <strong class="username">@{{ vData.username }}</strong>
-                      <span class="user-id">ID: {{ userId }}</span>
+                    <div class="flex flex-col">
+                      <span class="text-sm font-semibold text-[var(--color-primary)]">@{{ vData.username }}</span>
+                      <span class="text-xs text-[var(--text-muted)] font-mono mt-0.5">ID: {{ userId }}</span>
                     </div>
                   </div>
                 </td>
                 
                 <!-- Strike Count -->
-                <td>
-                  <div class="strike-metric">
-                    <span :class="['strike-count', getStrikeColor(vData.strikes)]">
+                <td class="py-4 px-6 whitespace-nowrap">
+                  <div class="flex flex-col gap-1.5 w-32">
+                    <span :class="['text-sm font-bold', getStrikeColor(vData.strikes)]">
                       {{ vData.strikes }} Strike{{ vData.strikes > 1 ? 's' : '' }}
                     </span>
-                    <div class="mini-bar-track">
-                      <div :class="['mini-bar', getStrikeColor(vData.strikes)]" :style="{ width: Math.min(100, (vData.strikes / 4) * 100) + '%' }"></div>
+                    <div class="h-1.5 w-full bg-slate-500/10 rounded-full overflow-hidden">
+                      <div :class="['h-full rounded-full transition-all duration-500', getStrikeBg(vData.strikes)]" 
+                           :style="{ width: Math.min(100, (vData.strikes / 4) * 100) + '%' }"></div>
                     </div>
                   </div>
                 </td>
                 
                 <!-- Status Badge -->
-                <td>
-                  <span :class="['badge', getBadgeColor(vData.strikes)]">{{ getBadgeText(vData.strikes) }}</span>
+                <td class="py-4 px-6 whitespace-nowrap">
+                  <span :class="['inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border', getBadgeClass(vData.strikes)]">
+                    {{ getBadgeText(vData.strikes) }}
+                  </span>
                 </td>
                 
                 <!-- Time -->
-                <td class="time-cell">{{ vData.last_violation || 'N/A' }}</td>
+                <td class="py-4 px-6 whitespace-nowrap text-sm text-[var(--text-body)]">
+                  {{ vData.last_violation || 'N/A' }}
+                </td>
                 
                 <!-- Actions -->
-                <td class="text-right">
-                  <button class="btn-action" @click="resetStrikes(userId, vData.username)" title="Clear strikes">
-                    <span class="btn-text">Reset Strikes</span>
-                    <IconRefresh class="icon btn-icon" />
+                <td class="py-4 px-6 whitespace-nowrap text-right">
+                  <button 
+                    @click="resetStrikes(userId, vData.username)"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-slate-500/10 border border-transparent hover:border-[var(--border-color)] transition-all"
+                    title="Clear strikes"
+                  >
+                    <span>Reset</span>
+                    <IconRefresh class="w-3.5 h-3.5" />
                   </button>
                 </td>
               </tr>
@@ -104,21 +122,27 @@ onUnmounted(() => {
 })
 
 function getRowClass(strikes) {
-  if (strikes >= 4) return 'danger-row'
-  if (strikes >= 2) return 'warning-row'
+  if (strikes >= 4) return 'bg-red-500/5 hover:bg-red-500/10'
+  if (strikes >= 2) return 'bg-amber-500/5 hover:bg-amber-500/10'
   return ''
 }
 
 function getStrikeColor(strikes) {
-  if (strikes >= 4) return 'high'
-  if (strikes >= 2) return 'medium'
-  return 'low'
+  if (strikes >= 4) return 'text-red-400'
+  if (strikes >= 2) return 'text-amber-400'
+  return 'text-emerald-400'
 }
 
-function getBadgeColor(strikes) {
-  if (strikes >= 4) return 'red'
-  if (strikes >= 2) return 'orange'
-  return 'green'
+function getStrikeBg(strikes) {
+  if (strikes >= 4) return 'bg-red-400'
+  if (strikes >= 2) return 'bg-amber-400'
+  return 'bg-emerald-400'
+}
+
+function getBadgeClass(strikes) {
+  if (strikes >= 4) return 'bg-red-500/10 text-red-500 border-red-500/20'
+  if (strikes >= 2) return 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+  return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
 }
 
 function getBadgeText(strikes) {
@@ -136,8 +160,7 @@ function getAvatarStyle(username) {
   const c1 = `hsl(${hash % 360}, 65%, 45%)`
   const c2 = `hsl(${(hash + 60) % 360}, 65%, 35%)`
   return {
-    background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`,
-    boxShadow: `0 4px 10px rgba(0, 0, 0, 0.1)`
+    background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
   }
 }
 
@@ -154,262 +177,3 @@ async function resetStrikes(userId, username) {
   }
 }
 </script>
-
-<style scoped>
-.violations-view {
-  animation: fadeIn 0.4s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.card {
-  overflow: hidden;
-}
-
-.card-header {
-  padding: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.card-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.subtitle {
-  margin: 4px 0 0 0;
-  color: var(--color-text-light);
-  font-size: 0.85rem;
-}
-
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--color-text-white);
-  background: rgba(0, 0, 0, 0.3);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.status-indicator .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--color-text-light);
-}
-
-.status-indicator.scanning .dot {
-  background-color: var(--color-secondary-light);
-  box-shadow: 0 0 8px var(--color-secondary-light);
-  animation: pulse 1.5s infinite alternate;
-}
-
-@keyframes pulse {
-  from { opacity: 0.4; }
-  to { opacity: 1; }
-}
-
-.card-body {
-  padding: 0;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 64px 32px;
-  color: var(--color-text-light);
-}
-
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 16px;
-  color: var(--color-disabled-text) !important;
-}
-
-.header-icon {
-  color: var(--color-accent) !important;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.table-container {
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th {
-  text-align: left;
-  padding: 14px 24px;
-  color: var(--color-text-light);
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--color-border);
-  background-color: rgba(0, 0, 0, 0.2);
-}
-
-.data-table td {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-  transition: var(--transition-smooth);
-}
-
-.data-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.data-table tbody tr {
-  transition: var(--transition-smooth);
-}
-
-.data-table tbody tr:hover td {
-  background-color: rgba(255, 255, 255, 0.03);
-}
-
-.danger-row td {
-  background-color: rgba(239, 68, 68, 0.05);
-}
-
-.warning-row td {
-  background-color: rgba(234, 179, 8, 0.05);
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  color: var(--color-text-white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.user-meta {
-  display: flex;
-  flex-direction: column;
-}
-
-.username {
-  font-weight: 600;
-  color: var(--color-primary);
-  font-size: 0.95rem;
-}
-
-.user-id {
-  font-size: 0.75rem;
-  color: var(--color-text-light);
-  font-family: monospace;
-}
-
-.strike-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 140px;
-}
-
-.strike-count {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.strike-count.high { color: #FCA5A5; }
-.strike-count.medium { color: #FDBA74; }
-.strike-count.low { color: #86EFAC; }
-
-.mini-bar-track {
-  height: 4px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.mini-bar {
-  height: 100%;
-  border-radius: 2px;
-}
-
-.mini-bar.high { background-color: #FCA5A5; }
-.mini-bar.medium { background-color: #FDBA74; }
-.mini-bar.low { background-color: #86EFAC; }
-
-.badge {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  text-align: center;
-}
-
-.badge.red { background-color: rgba(239, 68, 68, 0.15); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.3); }
-.badge.orange { background-color: rgba(249, 115, 22, 0.15); color: #FDBA74; border: 1px solid rgba(249, 115, 22, 0.3); }
-.badge.green { background-color: rgba(34, 197, 94, 0.15); color: #86EFAC; border: 1px solid rgba(34, 197, 94, 0.3); }
-
-.time-cell {
-  font-size: 0.9rem;
-  color: var(--color-text-body);
-}
-
-.text-right {
-  text-align: right;
-}
-
-.btn-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-white);
-  transition: var(--transition-smooth);
-}
-
-.btn-action:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: var(--color-text-white);
-  transform: translateY(-1px);
-}
-
-.btn-action:active {
-  transform: translateY(0);
-}
-
-.btn-icon {
-  font-size: 0.95rem;
-}
-</style>

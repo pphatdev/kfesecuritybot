@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
     const fileData = fs.readFileSync(filePath, 'utf-8')
     const data = JSON.parse(fileData)
     if (!data.pattern) data.pattern = []
+    if (!data.sticker) data.sticker = []
     
     if (data[category]) {
       if (category === 'pattern') {
@@ -30,6 +31,14 @@ export default defineEventHandler(async (event) => {
         data.pattern.push({ word: lowerWord, response: response || '' })
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
         return { success: true, message: `Added '${lowerWord}' to ${category}` }
+      } else if (category === 'sticker') {
+        const trimmedWord = word.trim()
+        if (data[category].includes(trimmedWord)) {
+          throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
+        }
+        data[category].push(trimmedWord)
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+        return { success: true, message: `Added '${trimmedWord}' to ${category}` }
       } else {
         const lowerWord = word.trim().toLowerCase()
         if (data[category].includes(lowerWord)) {

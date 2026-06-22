@@ -47,6 +47,8 @@ _DEFAULT_TOXIC = [
 
 _DEFAULT_PATTERN = []
 
+_DEFAULT_STICKER = []
+
 
 def _load_all() -> dict:
     """
@@ -54,7 +56,7 @@ def _load_all() -> dict:
     If the file doesn't exist, initialize it with the built-in defaults.
     """
     if not KEYWORDS_FILE.exists():
-        data = {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy()}
+        data = {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy(), "sticker": _DEFAULT_STICKER.copy()}
         _save(data)
         logger.info("Initialized keywords.json with built-in defaults.")
         return data
@@ -64,10 +66,12 @@ def _load_all() -> dict:
             data = json.load(f)
             if "pattern" not in data:
                 data["pattern"] = _DEFAULT_PATTERN.copy()
+            if "sticker" not in data:
+                data["sticker"] = _DEFAULT_STICKER.copy()
             return data
     except Exception as e:
         logger.error(f"Failed to load keywords.json: {e}")
-        return {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy()}
+        return {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy(), "sticker": _DEFAULT_STICKER.copy()}
 
 
 def _save(data: dict):
@@ -103,7 +107,7 @@ def remove_keyword(word: str) -> bool:
     data = _load_all()
     removed = False
     
-    for cat in ("spam", "toxic"):
+    for cat in ("spam", "toxic", "sticker"):
         target_word = word.lower()
         if target_word in data.get(cat, []):
             data[cat].remove(target_word)
@@ -130,7 +134,7 @@ def get_custom_keywords() -> dict:
     return _load_all()
 
 
-def pre_check(text: str) -> tuple[str, str | None] | None:
+def pre_check(text: str, sticker=None) -> tuple[str, str | None] | None:
     """
     Check text against keyword lists.
     All keywords are read from the JSON file on every call — no restart needed.
@@ -146,6 +150,27 @@ def pre_check(text: str) -> tuple[str, str | None] | None:
     for kw in data.get("toxic", []):
         if kw.lower() in lower:
             return ("Toxic", None)
+
+    if sticker:
+        for kw in data.get("sticker", []):
+            kw_str = kw.strip()
+            kw_lower = kw_str.lower()
+            if kw_lower.startswith("pack:"):
+                target = kw_str[5:]
+                if sticker.set_name and target.lower() == sticker.set_name.lower():
+                    return ("Sticker", f"Banned Sticker Pack ({sticker.set_name})")
+            elif kw_lower.startswith("emoji:"):
+                target = kw_str[6:]
+                if sticker.emoji and target == sticker.emoji:
+                    return ("Sticker", f"Banned Sticker Emoji ({sticker.emoji})")
+            elif kw_lower.startswith("id:"):
+                target = kw_str[3:]
+                if sticker.file_unique_id and target == sticker.file_unique_id:
+                    return ("Sticker", f"Banned Sticker ID ({sticker.file_unique_id})")
+            else:
+                # Default to pack matching for backwards compatibility
+                if sticker.set_name and kw_str.lower() == sticker.set_name.lower():
+                    return ("Sticker", f"Banned Sticker Pack ({sticker.set_name})")
 
     for item in data.get("pattern", []):
         if isinstance(item, dict):

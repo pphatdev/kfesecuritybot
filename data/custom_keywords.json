@@ -1,6 +1,11 @@
 {
   "spam": [],
   "toxic": [],
+  "sticker": [
+    "pack:naked_aquamarine_coyote_by_fstikbot",
+    "pack:watfauck_by_Stickers_Maker_Robot",
+    "pack:dx215_by_fstikbot"
+  ],
   "pattern": [
     "\\b(?:\\+?\\d{1,3}[-.\\s]?)?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{3,4}\\b",
     "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
@@ -110,7 +115,6 @@
     "\\bshut up\\b",
     "\\bmotherfucker\\b",
     "\\bfuck you\\b",
-    "\\bnaked_aquamarine_coyote_by_fstikbot\\b",
     "\\bpiece of shit\\b",
     "\\bbitch\\b",
     "\\basshole\\b",
@@ -131,9 +135,7 @@
     "មី[\\sក-អ]*ល្ងង់",
     "អា[\\sក-អ]*ប្រកាច់",
     "មី[\\sក-អ]*ឆ្កួត",
-    "\\bwatfauck_by_Stickers_Maker_Robot\\b",
     "[\\sក-អ]*ងាប់[\\sក-អ]*",
-    "ក្ដិត[\\sក-អ]*",
-    "\\bdx215_by_fstikbot\\b"
+    "ក្ដិត[\\sក-អ]*"
   ]
 }

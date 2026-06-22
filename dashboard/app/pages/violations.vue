@@ -2,29 +2,29 @@
   <div class="flex flex-col gap-6">
     <div class="glass-card rounded-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
       <!-- Header -->
-      <div class="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div class="px-6 py-5 border-b border-(--border-color) bg-(--bg-card) flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 class="text-[16px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
-            <IconAlertTriangle class="w-5 h-5 text-[var(--color-warning)]" />
+          <h2 class="text-[16px] font-semibold text-(--text-heading) flex items-center gap-2">
+            <IconAlertTriangle class="w-5 h-5 text-warning" />
             User Strike Tracking
           </h2>
-          <p class="text-[13px] text-[var(--text-muted)] mt-1">Moderation record. Users with 4+ strikes trigger the public warning callout.</p>
+          <p class="text-[13px] text-(--text-muted) mt-1">Moderation record. Users with 4+ strikes trigger the public warning callout.</p>
         </div>
         
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/5 border border-[var(--border-color)]">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/5 border border-(--border-color)">
           <span class="relative flex h-2 w-2">
-            <span v-if="!pending" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2" :class="pending ? 'bg-[var(--text-muted)]' : 'bg-[var(--color-success)]'"></span>
+            <span v-if="!pending" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2" :class="pending ? 'bg-(--text-muted)' : 'bg-success'"></span>
           </span>
-          <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
             {{ pending ? 'Syncing...' : 'Live Monitoring' }}
           </span>
         </div>
       </div>
       
       <!-- Content -->
-      <div class="bg-[var(--bg-card)]">
-        <div v-if="!stats || !Object.keys(stats.violations || {}).length" class="flex flex-col items-center justify-center py-20 text-[var(--text-muted)]">
+      <div class="bg-(--bg-card)">
+        <div v-if="!stats || !Object.keys(stats.violations || {}).length" class="flex flex-col items-center justify-center py-20 text-(--text-muted)">
           <IconShield class="w-16 h-16 mb-4 opacity-20" />
           <p class="text-sm font-medium">No user violations recorded. Chat members are behaving well!</p>
         </div>
@@ -32,15 +32,15 @@
         <div class="w-full overflow-x-auto" v-else>
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="bg-slate-500/5 border-b border-[var(--border-color)]">
-                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">User / Identity</th>
-                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">Strikes Logged</th>
-                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">Threat Level</th>
-                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider whitespace-nowrap">Last Violation Time</th>
-                <th class="py-3 px-6 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider text-right whitespace-nowrap">Actions</th>
+              <tr class="bg-slate-500/5 border-b border-(--border-color)">
+                <th class="py-3 px-6 text-xs font-semibold text-(--text-muted) uppercase tracking-wider whitespace-nowrap">User / Identity</th>
+                <th class="py-3 px-6 text-xs font-semibold text-(--text-muted) uppercase tracking-wider whitespace-nowrap">Strikes Logged</th>
+                <th class="py-3 px-6 text-xs font-semibold text-(--text-muted) uppercase tracking-wider whitespace-nowrap">Threat Level</th>
+                <th class="py-3 px-6 text-xs font-semibold text-(--text-muted) uppercase tracking-wider whitespace-nowrap">Last Violation Time</th>
+                <th class="py-3 px-6 text-xs font-semibold text-(--text-muted) uppercase tracking-wider text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-[var(--border-color)]">
+            <tbody class="divide-y divide-(--border-color)">
               <tr v-for="(vData, userId) in stats.violations" :key="userId" 
                   class="transition-colors hover:bg-slate-500/5 group"
                   :class="getRowClass(vData.strikes)">
@@ -52,8 +52,8 @@
                       {{ vData.username.substring(0, 2).toUpperCase() }}
                     </div>
                     <div class="flex flex-col">
-                      <span class="text-sm font-semibold text-[var(--color-primary)]">@{{ vData.username }}</span>
-                      <span class="text-xs text-[var(--text-muted)] font-mono mt-0.5">ID: {{ userId }}</span>
+                      <span class="text-sm font-semibold text-primary">@{{ vData.username }}</span>
+                      <span class="text-xs text-(--text-muted) font-mono mt-0.5">ID: {{ userId }}</span>
                     </div>
                   </div>
                 </td>
@@ -79,7 +79,7 @@
                 </td>
                 
                 <!-- Time -->
-                <td class="py-4 px-6 whitespace-nowrap text-sm text-[var(--text-body)]">
+                <td class="py-4 px-6 whitespace-nowrap text-sm text-(--text-body)">
                   {{ vData.last_violation || 'N/A' }}
                 </td>
                 
@@ -87,7 +87,7 @@
                 <td class="py-4 px-6 whitespace-nowrap text-right">
                   <button 
                     @click="resetStrikes(userId, vData.username)"
-                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-slate-500/10 border border-transparent hover:border-[var(--border-color)] transition-all"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10 border border-transparent hover:border-(--border-color) transition-all"
                     title="Clear strikes"
                   >
                     <span>Reset</span>

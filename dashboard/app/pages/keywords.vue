@@ -4,19 +4,19 @@
     <div class="glass-card rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
       <div class="relative w-full sm:w-96">
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <IconSearch class="h-5 w-5 text-[var(--text-muted)]" />
+          <IconSearch class="h-5 w-5 text-(--text-muted)" />
         </div>
         <input 
           type="text" 
           v-model="searchQuery" 
-          class="block w-full pl-10 pr-3 py-2 border border-[var(--border-color)] rounded-lg leading-5 bg-[var(--bg-card)] text-[var(--text-body)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] sm:text-sm transition-colors" 
+          class="block w-full pl-10 pr-3 py-2 border border-(--border-color) rounded-lg leading-5 bg-(--bg-card) text-(--text-body) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-colors" 
           placeholder="Search blocked keywords..." 
         />
       </div>
       
       <button 
         @click="showAddForm = !showAddForm"
-        class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[var(--color-primary)] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)] transition-colors"
+        class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
       >
         <template v-if="showAddForm">
           <IconX class="h-4 w-4" />
@@ -31,30 +31,30 @@
 
     <!-- Collapsible Add Keyword Form -->
     <div v-if="showAddForm" class="glass-card rounded-xl p-6 transition-all duration-300 transform origin-top animate-in slide-in-from-top-4 fade-in">
-      <div class="mb-5 border-b border-[var(--border-color)] pb-4">
-        <h3 class="text-lg font-semibold text-[var(--text-heading)]">Create Blocked Keyword</h3>
-        <p class="text-sm text-[var(--text-muted)] mt-1">Define a new word or pattern to match and instantly delete.</p>
+      <div class="mb-5 border-b border-(--border-color) pb-4">
+        <h3 class="text-lg font-semibold text-(--text-heading)">Create Blocked Keyword</h3>
+        <p class="text-sm text-(--text-muted) mt-1">Define a new word or pattern to match and instantly delete.</p>
       </div>
       
       <div class="flex flex-col md:flex-row gap-4 items-end">
         <div class="flex-1 w-full">
-          <label for="keyword-input" class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Keyword / Pattern</label>
+          <label for="keyword-input" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider mb-2">Keyword / Pattern</label>
           <input
             type="text"
             id="keyword-input"
             v-model="newWord"
-            class="block w-full px-3 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-card)] text-[var(--text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-colors"
+            class="block w-full px-3 py-2.5 border border-(--border-color) rounded-lg text-sm bg-(--bg-card) text-(--text-body) focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
             placeholder="e.g. crypto, free money..."
             @keyup.enter="addKeyword"
           />
         </div>
         
         <div class="w-full md:w-64">
-          <label for="category-select" class="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Category</label>
+          <label for="category-select" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider mb-2">Category</label>
           <select 
             id="category-select" 
             v-model="newCategory"
-            class="block w-full px-3 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-card)] text-[var(--text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-colors appearance-none"
+            class="block w-full px-3 py-2.5 border border-(--border-color) rounded-lg text-sm bg-(--bg-card) text-(--text-body) focus:outline-none focus:ring-2 focus:ring-primary transition-colors appearance-none"
           >
             <option value="spam">Spam / Promo</option>
             <option value="toxic">Toxic / Profanity</option>
@@ -65,7 +65,7 @@
           <button 
             @click="addKeyword" 
             :disabled="!newWord.trim()"
-            class="w-full flex items-center justify-center gap-2 px-6 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[var(--color-success)] hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="w-full flex items-center justify-center gap-2 px-6 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-success hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <span>Save Pattern</span>
             <IconDeviceFloppy class="h-4 w-4" />
@@ -75,21 +75,21 @@
     </div>
     
     <!-- Tab Bar Selector -->
-    <div v-if="!pending" class="flex flex-wrap gap-2 p-1.5 bg-slate-500/5 rounded-xl border border-[var(--border-color)] w-fit">
+    <div v-if="!pending" class="flex flex-wrap gap-2 p-1.5 bg-slate-500/5 rounded-xl border border-(--border-color) w-fit">
       <button 
         @click="activeTab = 'spam'"
         :class="[
           'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
           activeTab === 'spam' 
-            ? 'bg-[var(--color-primary)] text-white shadow-sm' 
-            : 'text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-slate-500/10'
+            ? 'bg-primary text-white shadow-sm' 
+            : 'text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10'
         ]"
       >
         <IconBan class="w-4 h-4" />
         <span>Spam Patterns</span>
         <span :class="[
           'px-2 py-0.5 rounded-full text-xs font-semibold',
-          activeTab === 'spam' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-[var(--text-muted)]'
+          activeTab === 'spam' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-(--text-muted)'
         ]">
           {{ keywords?.spam?.length || 0 }}
         </span>
@@ -100,15 +100,15 @@
         :class="[
           'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
           activeTab === 'toxic' 
-            ? 'bg-[var(--color-primary)] text-white shadow-sm' 
-            : 'text-[var(--text-muted)] hover:text-[var(--text-heading)] hover:bg-slate-500/10'
+            ? 'bg-primary text-white shadow-sm' 
+            : 'text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10'
         ]"
       >
         <IconShieldX class="w-4 h-4" />
         <span>Toxic Patterns</span>
         <span :class="[
           'px-2 py-0.5 rounded-full text-xs font-semibold',
-          activeTab === 'toxic' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-[var(--text-muted)]'
+          activeTab === 'toxic' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-(--text-muted)'
         ]">
           {{ keywords?.toxic?.length || 0 }}
         </span>
@@ -120,16 +120,16 @@
       
       <!-- Spam Keywords Tab -->
       <div v-if="activeTab === 'spam'" class="flex flex-col h-full animate-in fade-in duration-300">
-        <div class="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
-          <h3 class="text-[15px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-[var(--color-warning)]"></span>
+        <div class="px-6 py-5 border-b border-(--border-color) bg-(--bg-card)">
+          <h3 class="text-[15px] font-semibold text-(--text-heading) flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-warning"></span>
             Spam Detection Filter
           </h3>
-          <p class="text-[13px] text-[var(--text-muted)] mt-1">These pattern matches trigger automatic deletion to filter promos and spam scripts.</p>
+          <p class="text-[13px] text-(--text-muted) mt-1">These pattern matches trigger automatic deletion to filter promos and spam scripts.</p>
         </div>
         
         <div class="p-6 flex-1 bg-slate-500/5">
-          <div v-if="!filteredSpam.length" class="flex flex-col items-center justify-center h-48 text-[var(--text-muted)]">
+          <div v-if="!filteredSpam.length" class="flex flex-col items-center justify-center h-48 text-(--text-muted)">
             <IconBan class="w-12 h-12 mb-3 opacity-20" />
             <p class="text-sm">No matching spam keywords found.</p>
           </div>
@@ -155,16 +155,16 @@
 
       <!-- Toxic Keywords Tab -->
       <div v-if="activeTab === 'toxic'" class="flex flex-col h-full animate-in fade-in duration-300">
-        <div class="px-6 py-5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
-          <h3 class="text-[15px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-[var(--color-danger)]"></span>
+        <div class="px-6 py-5 border-b border-(--border-color) bg-(--bg-card)">
+          <h3 class="text-[15px] font-semibold text-(--text-heading) flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-danger"></span>
             Toxic & Profanity Filter
           </h3>
-          <p class="text-[13px] text-[var(--text-muted)] mt-1">These patterns match harmful, abusive, or highly toxic language and trigger immediate strike allocation.</p>
+          <p class="text-[13px] text-(--text-muted) mt-1">These patterns match harmful, abusive, or highly toxic language and trigger immediate strike allocation.</p>
         </div>
         
         <div class="p-6 flex-1 bg-slate-500/5">
-          <div v-if="!filteredToxic.length" class="flex flex-col items-center justify-center h-48 text-[var(--text-muted)]">
+          <div v-if="!filteredToxic.length" class="flex flex-col items-center justify-center h-48 text-(--text-muted)">
             <IconShieldX class="w-12 h-12 mb-3 opacity-20" />
             <p class="text-sm">No matching toxic keywords found.</p>
           </div>
@@ -189,8 +189,8 @@
       </div>
     </div>
     
-    <div v-else class="glass-card rounded-xl min-h-[400px] flex flex-col items-center justify-center gap-4 text-[var(--text-muted)]">
-      <div class="w-8 h-8 border-4 border-slate-500/20 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+    <div v-else class="glass-card rounded-xl min-h-[400px] flex flex-col items-center justify-center gap-4 text-(--text-muted)">
+      <div class="w-8 h-8 border-4 border-slate-500/20 border-t-primary rounded-full animate-spin"></div>
       <p class="text-sm font-medium">Synchronizing blocklists...</p>
     </div>
   </div>

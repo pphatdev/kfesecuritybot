@@ -1,27 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 :root {
-  /* Core Colors */
-  --color-primary: #7D3F00; /* Russet / Warm Brown */
-  --color-secondary: #067302; /* Forest Green */
+  /* Core Premium Colors - Enhanced for Dark Mode */
+  --color-primary: #E58F24; /* Warm glowing Gold */
+  --color-primary-light: #FFB74D;
+  --color-secondary: #22C55E; /* Neon Green */
+  --color-secondary-light: #4ADE80;
+  --color-accent: #E58F24;
   
-  /* Layout & Surfaces */
-  --color-bg-app: #FDFBF7; /* Soft warm off-white */
-  --color-bg-surface: #FFFFFF; /* Pure white */
-  
-  /* UI Elements */
-  --color-border: #DCD6CD; /* Muted gray-brown */
-  --color-active: #067302; /* Active/Focus state */
+  /* Layout & Surfaces (Deep Dark Glassmorphic) */
+  --color-bg-app: #0F0D0C; /* Deep sophisticated dark */
+  --color-bg-surface: rgba(30, 28, 26, 0.6); /* Translucent dark surface */
+  --color-bg-surface-solid: #1A1816;
+  --color-border: rgba(255, 255, 255, 0.08); /* Crisp translucent white */
+  --color-border-focus: rgba(229, 143, 36, 0.5);
+  --color-active: #E58F24;
   
   /* Typography */
-  --color-text-body: #2A2421; /* Dark espresso-brown */
-  --color-text-light: #736860; /* Lighter text for secondary info */
+  --color-text-body: #F3F4F6; /* Off-white */
+  --color-text-light: #9CA3AF; /* Soft gray */
   --color-text-white: #FFFFFF;
   
+  /* Disabled States */
+  --color-disabled-bg: rgba(255, 255, 255, 0.05);
+  --color-disabled-text: rgba(255, 255, 255, 0.3);
+  
   /* Utilities */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-sm: 0 1px 3px rgba(42, 36, 33, 0.1);
-  --shadow-md: 0 4px 6px rgba(42, 36, 33, 0.08);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --shadow-sm: 0 4px 12px rgba(125, 63, 0, 0.03);
+  --shadow-md: 0 12px 30px rgba(125, 63, 0, 0.06);
+  --shadow-lg: 0 20px 50px rgba(125, 63, 0, 0.1);
+  --transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --glass-backdrop: blur(16px) saturate(120%);
 }
 
 body {
@@ -34,12 +46,72 @@ body {
 }
 
 /* Reset Box Sizing */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
+/* Glassmorphism Classes */
+.glass-panel {
+  background: var(--color-bg-surface);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-smooth);
+}
+
+.glass-panel:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* Form Fields - Restyled with Solid Background for Legibility */
+input[type="text"],
+input[type="password"],
+select,
+textarea {
+  background-color: var(--color-bg-surface-solid) !important;
+  color: var(--color-text-body) !important;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  transition: var(--transition-smooth);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-active) !important;
+  box-shadow: 0 0 0 3px rgba(229, 143, 36, 0.15) !important;
+  outline: none;
+}
+
+/* Form Labels Legibility */
+label {
+  color: var(--color-text-light) !important;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Disabled Form Elements */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background-color: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
+  cursor: not-allowed;
+  border-color: var(--color-disabled-bg) !important;
+}
+
 /* Base Headings */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-top: 0;
   color: var(--color-primary);
 }
@@ -53,4 +125,18 @@ a {
 
 a:hover {
   color: var(--color-secondary);
+}
+
+/* Global SVG Vector Icon Helper */
+.icon {
+  width: 1.25em;
+  height: 1.25em;
+  stroke: currentColor;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  vertical-align: middle;
+  display: inline-block;
+  flex-shrink: 0;
 }

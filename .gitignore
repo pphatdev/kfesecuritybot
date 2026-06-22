@@ -43,4 +43,4 @@ dashboard/.env
 Thumbs.db
 
 # Dynamic Data files
-data/dashboard_stats.json
+data/*.json

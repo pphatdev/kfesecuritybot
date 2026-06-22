@@ -1,7 +1,9 @@
+import os
 import logging
 from telegram import Update, ChatMember
 from telegram.ext import ContextTypes
-from app.services.keywords import add_keyword, remove_keyword, get_custom_keywords
+from app.services.otp import generate_otp
+from app.services.allowed_users import add_allowed_user, remove_allowed_user, is_user_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -14,82 +16,138 @@ async def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return member.status in (ChatMember.ADMINISTRATOR, ChatMember.OWNER)
 
 
-async def addword_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+
+async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    /addword <toxic|spam> <keyword>
-    Example: /addword toxic scammer
+    /login — Generate an OTP for dashboard login.
     """
-    if not await _is_admin(update, context):
-        await update.message.reply_text("⛔ Only group admins can use this command.")
+    user = update.effective_user
+    chat = update.effective_chat
+    
+    # Check if user is in authorized admins lists
+    allowed = False
+    
+    if is_user_allowed(user.id, user.username):
+        allowed = True
+    elif chat.type != "private":
+        # Fallback to group admin check if no lists are specified in .env and allowed_users.json
+        from app.services.allowed_users import load_allowed_users
+        allowed_data = load_allowed_users()
+        admin_usernames = [u.strip().lower() for u in (os.getenv("DASHBOARD_ADMINS") or "").split(",") if u.strip()]
+        admin_ids = [i.strip() for i in (os.getenv("DASHBOARD_ADMIN_IDS") or "").split(",") if i.strip()]
+        has_any_explicit_admins = bool(admin_usernames or admin_ids or allowed_data.get("usernames") or allowed_data.get("user_ids"))
+        
+        if not has_any_explicit_admins:
+            if await _is_admin(update, context):
+                allowed = True
+                
+    if not allowed:
+        from app.services.allowed_users import load_allowed_users
+        allowed_data = load_allowed_users()
+        admin_usernames = [u.strip().lower() for u in (os.getenv("DASHBOARD_ADMINS") or "").split(",") if u.strip()]
+        admin_ids = [i.strip() for i in (os.getenv("DASHBOARD_ADMIN_IDS") or "").split(",") if i.strip()]
+        has_any_explicit_admins = bool(admin_usernames or admin_ids or allowed_data.get("usernames") or allowed_data.get("user_ids"))
+        
+        if chat.type == "private" and not has_any_explicit_admins:
+            await update.message.reply_text(
+                "⛔ *Dashboard access is restricted.*\n\n"
+                "No dashboard administrators are configured in the bot's `.env` file or allowed list.\n\n"
+                "To authorize yourself, either:\n"
+                "1. Run `/login` inside a Telegram group chat where you are an administrator.\n"
+                "2. Add your Telegram username to `DASHBOARD_ADMINS` in the `.env` file (e.g., `DASHBOARD_ADMINS=your_username`) and restart the bot.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text("⛔ You are not authorized to generate a login OTP.")
         return
 
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text(
-            "Usage: /addword <toxic|spam> <keyword>\n"
-            "Example: /addword toxic scammer"
+    # Generate OTP
+    otp = generate_otp(user.id, user.username)
+    
+    # Try sending via DM
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=(
+                f"🔐 *BotControl Dashboard Login*\n\n"
+                f"Your One-Time Password (OTP) is: `{otp}`\n"
+                f"It is valid for 5 minutes.\n\n"
+                f"Enter your Telegram Username (`{user.username or user.id}`) and this OTP on the dashboard login page."
+            ),
+            parse_mode="Markdown"
         )
-        return
-
-    category = args[0].lower()
-    if category not in ("spam", "toxic"):
-        await update.message.reply_text("❌ Category must be either `toxic` or `spam`.", parse_mode="Markdown")
-        return
-
-    keyword = " ".join(args[1:]).lower()
-    added = add_keyword(keyword, category)
-
-    if added:
-        await update.message.reply_text(
-            f"✅ Keyword `{keyword}` added to *{category}* list.", parse_mode="Markdown"
-        )
-    else:
-        await update.message.reply_text(
-            f"⚠️ Keyword `{keyword}` already exists in the *{category}* list.", parse_mode="Markdown"
-        )
+        if chat.type != "private":
+            await update.message.reply_text("🔐 I've sent your login OTP via private message.")
+    except Exception as e:
+        logger.warning(f"Failed to send DM to user {user.id}: {e}")
+        if chat.type != "private":
+            await update.message.reply_text(
+                f"⛔ I couldn't send you the OTP via private message. "
+                f"Please start a private chat with me first (click @{(await context.bot.get_me()).username}), then run `/login` again."
+            )
+        else:
+            await update.message.reply_text("❌ Something went wrong while generating/sending the OTP. Please try again.")
 
 
-async def removeword_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def _is_caller_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if the caller is an env-configured admin or a group admin."""
+    user = update.effective_user
+    chat = update.effective_chat
+    
+    admin_usernames = [u.strip().lower() for u in (os.getenv("DASHBOARD_ADMINS") or "").split(",") if u.strip()]
+    admin_ids = [i.strip() for i in (os.getenv("DASHBOARD_ADMIN_IDS") or "").split(",") if i.strip()]
+    
+    if str(user.id) in admin_ids or (user.username and user.username.lower() in admin_usernames):
+        return True
+        
+    if chat.type != "private":
+        if await _is_admin(update, context):
+            return True
+            
+    return False
+
+
+async def adduser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    /removeword <keyword>
-    Example: /removeword scammer
+    /adduser <username|user_id>
+    Example: /adduser @another_admin
     """
-    if not await _is_admin(update, context):
-        await update.message.reply_text("⛔ Only group admins can use this command.")
+    if not await _is_caller_admin(update, context):
+        await update.message.reply_text("⛔ Only bot creators or group admins can add dashboard users.")
         return
 
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /removeword <keyword>")
+        await update.message.reply_text("Usage: /adduser <username|user_id>\nExample: /adduser @another_admin")
         return
-
-    keyword = " ".join(args).lower()
-    removed = remove_keyword(keyword)
-
-    if removed:
-        await update.message.reply_text(f"🗑️ Keyword `{keyword}` has been removed.", parse_mode="Markdown")
+        
+    target = args[0]
+    added = add_allowed_user(target)
+    if added:
+        await update.message.reply_text(f"✅ User `{target}` is now authorized to access the dashboard.")
     else:
-        await update.message.reply_text(f"❌ Keyword `{keyword}` was not found in the custom list.", parse_mode="Markdown")
+        await update.message.reply_text(f"⚠️ User `{target}` is already authorized or invalid.")
 
 
-async def listkeywords_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def removeuser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    /keywords — List all admin-added custom keywords.
+    /removeuser <username|user_id>
+    Example: /removeuser @another_admin
     """
-    if not await _is_admin(update, context):
-        await update.message.reply_text("⛔ Only group admins can use this command.")
+    if not await _is_caller_admin(update, context):
+        await update.message.reply_text("⛔ Only bot creators or group admins can remove dashboard users.")
         return
 
-    custom = get_custom_keywords()
-    spam_list = custom.get("spam", [])
-    toxic_list = custom.get("toxic", [])
-
-    spam_text = "\n".join(f"  • `{k}`" for k in spam_list) if spam_list else "  _(none)_"
-    toxic_text = "\n".join(f"  • `{k}`" for k in toxic_list) if toxic_list else "  _(none)_"
-
-    message = (
-        "📋 *Custom Keyword List*\n\n"
-        f"🚫 *Spam:*\n{spam_text}\n\n"
-        f"☠️ *Toxic:*\n{toxic_text}"
-    )
-    await update.message.reply_text(message, parse_mode="Markdown")
+    args = context.args
+    if not args:
+        await update.message.reply_text("Usage: /removeuser <username|user_id>\nExample: /removeuser @another_admin")
+        return
+        
+    target = args[0]
+    removed = remove_allowed_user(target)
+    if removed:
+        await update.message.reply_text(f"🗑️ User `{target}` has been removed from authorized dashboard users.")
+    else:
+        await update.message.reply_text(f"❌ User `{target}` was not found in the custom allowed list.")

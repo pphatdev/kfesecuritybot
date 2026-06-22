@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 export default defineEventHandler(async (event) => {
+  verifySession(event)
   try {
-    const body = await readBody(event)
-    const { userId } = body
+    const query = getQuery(event)
+    const userId = query.userId
     
     if (!userId) {
       throw createError({ statusCode: 400, statusMessage: 'userId is required' })

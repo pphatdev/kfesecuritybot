@@ -62,13 +62,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if pre_result:
         logger.info(f"Keyword matched: {pre_result} — deleting message")
-        # Let's try to categorize it heuristically: if it's a known bad word or emoji it's toxic, else spam.
-        # But for now, we just pass "spam" or "toxic" based on the string or assume spam.
-        # A simple check: if pre_result has typical toxic words, label as toxic. 
-        # But we'll just default to 'toxic' if it's mostly non-english or has 🖕, else 'spam'
-        category = "toxic" if "🖕" in pre_result or "idiot" in pre_result or "ឆ្កែ" in pre_result else "spam"
         
-        await _delete_and_notify(message, pre_result, source="keyword filter", category=category)
+        # Categorize based on the result from pre_check
+        if pre_result == "Toxic":
+            category = "toxic"
+            display_reason = "Toxic Content"
+        elif pre_result == "Pattern":
+            category = "spam"
+            display_reason = "Sensitive pattern or restricted content detected"
+        else:
+            # Both "Spam" and "Pattern" map to the "spam" category for strike tracking
+            category = "spam"
+            display_reason = "Spam Content"
+        
+        await _delete_and_notify(message, display_reason, source="keyword filter", category=category)
         return
 
     # Non-matching messages are silently ignored

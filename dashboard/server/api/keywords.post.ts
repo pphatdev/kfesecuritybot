@@ -18,9 +18,10 @@ export default defineEventHandler(async (event) => {
     
     const fileData = fs.readFileSync(filePath, 'utf-8')
     const data = JSON.parse(fileData)
+    if (!data.pattern) data.pattern = []
     
     if (data[category]) {
-      const lowerWord = word.trim().toLowerCase()
+      const lowerWord = category === 'pattern' ? word.trim() : word.trim().toLowerCase()
       if (data[category].includes(lowerWord)) {
         throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
       }

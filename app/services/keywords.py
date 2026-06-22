@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ _DEFAULT_TOXIC = [
     "ចោរ", "ក្រអឺតក្រទម", "ឯងហ្នឹង",
 ]
 
+_DEFAULT_PATTERN = []
+
 
 def _load_all() -> dict:
     """
@@ -51,17 +54,20 @@ def _load_all() -> dict:
     If the file doesn't exist, initialize it with the built-in defaults.
     """
     if not KEYWORDS_FILE.exists():
-        data = {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy()}
+        data = {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy()}
         _save(data)
         logger.info("Initialized keywords.json with built-in defaults.")
         return data
 
     try:
         with open(KEYWORDS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            if "pattern" not in data:
+                data["pattern"] = _DEFAULT_PATTERN.copy()
+            return data
     except Exception as e:
         logger.error(f"Failed to load keywords.json: {e}")
-        return {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy()}
+        return {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy()}
 
 
 def _save(data: dict):
@@ -73,9 +79,9 @@ def _save(data: dict):
 
 def add_keyword(word: str, category: str) -> bool:
     """Add a keyword. Returns True if added, False if already exists."""
-    word = word.strip().lower()
+    word = word.strip() if category == "pattern" else word.strip().lower()
     data = _load_all()
-    if word in data[category]:
+    if word in data.get(category, []):
         return False
     data[category].append(word)
     _save(data)
@@ -85,12 +91,14 @@ def add_keyword(word: str, category: str) -> bool:
 
 def remove_keyword(word: str) -> bool:
     """Remove a keyword from any category. Returns True if found and removed."""
-    word = word.strip().lower()
+    word = word.strip()
     data = _load_all()
     removed = False
-    for cat in ("spam", "toxic"):
-        if word in data[cat]:
-            data[cat].remove(word)
+    for cat in ("spam", "toxic", "pattern"):
+        # Match case-sensitive for pattern, case-insensitive for others
+        target_word = word if cat == "pattern" else word.lower()
+        if target_word in data.get(cat, []):
+            data[cat].remove(target_word)
             removed = True
     if removed:
         _save(data)
@@ -119,5 +127,13 @@ def pre_check(text: str) -> str | None:
     for kw in data.get("toxic", []):
         if kw.lower() in lower:
             return "Toxic"
+
+    for pat in data.get("pattern", []):
+        try:
+            if re.search(pat, text, re.IGNORECASE):
+                return "Pattern"
+        except re.error as e:
+            logger.warning(f"Invalid regex pattern '{pat}': {e}")
+            continue
 
     return None

@@ -58,6 +58,7 @@
           >
             <option value="spam">Spam / Promo</option>
             <option value="toxic">Toxic / Profanity</option>
+            <option value="pattern">Regex Pattern</option>
           </select>
         </div>
         
@@ -111,6 +112,25 @@
           activeTab === 'toxic' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-(--text-muted)'
         ]">
           {{ keywords?.toxic?.length || 0 }}
+        </span>
+      </button>
+
+      <button 
+        @click="activeTab = 'pattern'"
+        :class="[
+          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          activeTab === 'pattern' 
+            ? 'bg-primary text-white shadow-sm' 
+            : 'text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10'
+        ]"
+      >
+        <IconCode class="w-4 h-4" />
+        <span>Regex Patterns</span>
+        <span :class="[
+          'px-2 py-0.5 rounded-full text-xs font-semibold',
+          activeTab === 'pattern' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-(--text-muted)'
+        ]">
+          {{ keywords?.pattern?.length || 0 }}
         </span>
       </button>
     </div>
@@ -187,6 +207,41 @@
           </TransitionGroup>
         </div>
       </div>
+
+      <!-- Pattern Keywords Tab -->
+      <div v-if="activeTab === 'pattern'" class="flex flex-col h-full animate-in fade-in duration-300">
+        <div class="px-6 py-5 border-b border-(--border-color) bg-(--bg-card)">
+          <h3 class="text-[15px] font-semibold text-(--text-heading) flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-primary"></span>
+            Regex Pattern Filter
+          </h3>
+          <p class="text-[13px] text-(--text-muted) mt-1">Match messages based on regular expressions (e.g. \b[0-9]{4}\b) to block specific patterns.</p>
+        </div>
+        
+        <div class="p-6 flex-1 bg-slate-500/5">
+          <div v-if="!filteredPattern.length" class="flex flex-col items-center justify-center h-48 text-(--text-muted)">
+            <IconCode class="w-12 h-12 mb-3 opacity-20" />
+            <p class="text-sm">No matching regex patterns found.</p>
+          </div>
+          
+          <TransitionGroup name="tag" tag="div" class="flex flex-wrap gap-3" v-else>
+            <span 
+              v-for="word in filteredPattern" 
+              :key="word"
+              class="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg text-sm font-medium font-mono border border-blue-500/30 bg-blue-500/10 text-blue-500 shadow-sm hover:shadow-md transition-shadow group"
+            >
+              <span class="select-all">{{ word }}</span>
+              <button 
+                @click="deleteKeyword(word, 'pattern')" 
+                class="p-0.5 rounded-md text-blue-500/70 hover:text-blue-500 hover:bg-blue-500/20 transition-colors"
+                title="Delete pattern"
+              >
+                <IconX class="w-4 h-4" />
+              </button>
+            </span>
+          </TransitionGroup>
+        </div>
+      </div>
     </div>
     
     <div v-else class="glass-card rounded-xl min-h-[400px] flex flex-col items-center justify-center gap-4 text-(--text-muted)">
@@ -198,7 +253,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { IconSearch, IconPlus, IconX, IconDeviceFloppy, IconBan, IconShieldX } from '@tabler/icons-vue'
+import { IconSearch, IconPlus, IconX, IconDeviceFloppy, IconBan, IconShieldX, IconCode } from '@tabler/icons-vue'
 
 const { data: keywords, pending, refresh } = useFetch('/api/keywords')
 
@@ -218,6 +273,12 @@ const filteredToxic = computed(() => {
   if (!keywords.value?.toxic) return []
   if (!searchQuery.value) return keywords.value.toxic
   return keywords.value.toxic.filter(word => word.toLowerCase().includes(searchQuery.value.toLowerCase()))
+})
+
+const filteredPattern = computed(() => {
+  if (!keywords.value?.pattern) return []
+  if (!searchQuery.value) return keywords.value.pattern
+  return keywords.value.pattern.filter(word => word.toLowerCase().includes(searchQuery.value.toLowerCase()))
 })
 
 async function addKeyword() {

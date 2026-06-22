@@ -11,6 +11,7 @@ export default defineEventHandler((event) => {
       return { 
         spam: [], 
         toxic: [], 
+        pattern: [],
         debug_error: "File not found", 
         debug_path: filePath 
       }

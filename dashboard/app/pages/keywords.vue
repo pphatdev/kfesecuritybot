@@ -246,7 +246,7 @@
                 <span class="font-mono text-sm select-all">{{ p.word }}</span>
                 <button 
                   @click="deleteKeyword(p.word, 'pattern')" 
-                  class="p-1 rounded-md text-blue-500/70 hover:text-blue-500 hover:bg-blue-500/20 transition-colors flex-shrink-0"
+                  class="p-1 rounded-md text-blue-500/70 hover:text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
                   title="Delete pattern"
                 >
                   <IconX class="w-4 h-4" />

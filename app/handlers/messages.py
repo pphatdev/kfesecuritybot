@@ -7,16 +7,39 @@ from app.services.keywords import pre_check
 from app.handlers.commands import _bot_intro_html
 from app.services.stats import increment_scanned, log_violation, get_user_strikes
 from app.services.users_db import track_user
+from app.services.groups_db import track_group
 
 logger = logging.getLogger(__name__)
 
+async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the bot being added or removed from a group."""
+    result = update.my_chat_member
+    if not result:
+        return
+        
+    chat = result.chat
+    if chat.type != "private":
+        status = result.new_chat_member.status
+        if status in ['member', 'administrator']:
+            logger.info(f"Bot added to group: {chat.title} ({chat.id})")
+            track_group(chat.id, chat.title)
+        elif status in ['left', 'kicked']:
+            logger.info(f"Bot removed from group: {chat.title} ({chat.id})")
+            # Optionally, you could untrack the group, but keeping it is fine.
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process incoming messages. Handles mentions, keyword filter, and AI detection."""
-    message = update.message
+    message = update.message or update.channel_post
     
+    if not message:
+        return
+        
     # Track the user who sent the message
     if message.from_user:
         track_user(message.from_user.id, message.from_user.username)
+    # Track the group if it's not a private chat
+    if message.chat and message.chat.type != "private":
+        track_group(message.chat.id, message.chat.title)
         
     # Extract text from normal messages, captions, or sticker emojis
     text = message.text or message.caption or ""
@@ -38,7 +61,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Increment real-time scanned count
     increment_scanned()
 
-    username = message.from_user.username or message.from_user.first_name
+    if message.from_user:
+        username = message.from_user.username or message.from_user.first_name
+    elif message.sender_chat:
+        username = message.sender_chat.title
+    else:
+        username = "Unknown"
+        
     logger.info(f"Received message from @{username}: {text[:80]}")
 
     # --- Step 0: Check if the bot is mentioned or greeted ---
@@ -111,6 +140,8 @@ async def handle_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _reply_mention(message):
     """Reply to the user who mentioned the bot — same message as /start."""
+    if not message.from_user:
+        return
     user = message.from_user
     try:
         await message.reply_html(_bot_intro_html(user.mention_html()))
@@ -121,11 +152,22 @@ async def _reply_mention(message):
 
 async def _delete_and_notify(message, reason: str, source: str, category: str = "spam"):
     """Delete the message and notify the group with a warning."""
-    user = message.from_user
-    user_id = user.id
+    if message.from_user:
+        user = message.from_user
+        user_id = user.id
+        user_name = user.username or user.first_name
+        user_mention = user.mention_html()
+    elif message.sender_chat:
+        user_id = message.sender_chat.id
+        user_name = message.sender_chat.title
+        user_mention = f"<b>{user_name}</b>"
+    else:
+        user_id = 0
+        user_name = "Unknown"
+        user_mention = "<b>Unknown</b>"
     
     # Log to real-time dashboard (this also increments the strikes in JSON)
-    log_violation(user_id, user.username or user.first_name, reason, category, message.text or "Sticker/Media")
+    log_violation(user_id, user_name, reason, category, message.text or "Sticker/Media")
     
     current_strikes = get_user_strikes(user_id)
     
@@ -139,7 +181,6 @@ async def _delete_and_notify(message, reason: str, source: str, category: str = 
         logger.warning(f"Could not delete message: {e}")
 
     # Notify the chat
-    user_mention = user.mention_html()
     
     if current_strikes >= 4:
         text = (

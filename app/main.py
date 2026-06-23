@@ -12,10 +12,10 @@ httpx.AsyncClient.__init__ = _patched_httpx_init
 import logging
 import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, ChatMemberHandler, filters
 from app.config import config
 from app.handlers.commands import start_command, help_command
-from app.handlers.messages import handle_message
+from app.handlers.messages import handle_message, handle_my_chat_member
 from app.handlers.admin import adduser_command, removeuser_command
 # Enable logging
 logging.basicConfig(
@@ -44,7 +44,8 @@ def main() -> None:
     application.add_handler(CommandHandler("removeuser", removeuser_command))
 
     # Message handlers — handle_message also handles mention replies internally
-    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler((filters.ALL | filters.UpdateType.CHANNEL_POST) & ~filters.COMMAND, handle_message))
+    application.add_handler(ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
     logger.info("Bot is starting. Press Ctrl+C to stop.")
 

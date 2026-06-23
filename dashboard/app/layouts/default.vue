@@ -23,6 +23,10 @@
               <IconAlertTriangle class="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
               User Violations
             </NuxtLink>
+            <NuxtLink to="/announce" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[14px] font-medium transition-all duration-200 text-(--text-body) hover:bg-primary-subtle hover:text-primary group" active-class="bg-primary-subtle text-primary font-semibold shadow-sm">
+              <IconSpeakerphone class="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
+              Announcements
+            </NuxtLink>
           </nav>
         </div>
       </div>
@@ -97,7 +101,8 @@ import {
   IconMenu2,
   IconChevronRight,
   IconSun,
-  IconMoon
+  IconMoon,
+  IconSpeakerphone
 } from '@tabler/icons-vue'
 
 const route = useRoute()
@@ -131,6 +136,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/') return 'Dashboard Overview'
   if (route.path.includes('/keywords')) return 'Keyword Manager'
   if (route.path.includes('/violations')) return 'User Violations'
+  if (route.path.includes('/announce')) return 'Announcements'
   return 'Application'
 })
 

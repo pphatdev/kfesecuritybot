@@ -29,6 +29,7 @@
         :icon="IconBan"
         empty-message="No matching spam keywords found."
         @delete="w => deleteKeyword(w, 'spam')"
+        @edit="payload => editKeyword(payload, 'spam')"
       />
 
       <KeywordList
@@ -42,6 +43,7 @@
         :icon="IconShieldX"
         empty-message="No matching toxic keywords found."
         @delete="w => deleteKeyword(w, 'toxic')"
+        @edit="payload => editKeyword(payload, 'toxic')"
       />
 
       <KeywordList
@@ -57,6 +59,7 @@
         empty-message="No matching regex patterns found."
         :is-pattern="true"
         @delete="w => deleteKeyword(w, 'pattern')"
+        @edit="payload => editKeyword(payload, 'pattern')"
       />
 
       <KeywordList
@@ -71,6 +74,7 @@
         empty-message="No matching sticker packs found."
         :format-sticker="true"
         @delete="w => deleteKeyword(w, 'sticker')"
+        @edit="payload => editKeyword(payload, 'sticker')"
       />
     </div>
     
@@ -154,6 +158,18 @@ async function deleteKeyword(word, category) {
     await refresh()
   } catch (err) {
     alert('Failed to delete keyword: ' + err.message)
+  }
+}
+
+async function editKeyword(payload, category) {
+  try {
+    await $fetch('/api/keywords', {
+      method: 'PUT',
+      body: { ...payload, category }
+    })
+    await refresh()
+  } catch (err) {
+    alert('Failed to update keyword: ' + err.data?.statusMessage || err.message)
   }
 }
 </script>

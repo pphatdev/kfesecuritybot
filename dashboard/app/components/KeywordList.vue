@@ -75,7 +75,7 @@ const props = defineProps({
   itemClass: String,
   btnClass: String,
   borderClass: String,
-  icon: Object,
+  icon: [Object, Function],
   emptyMessage: String,
   isPattern: Boolean,
   formatSticker: Boolean

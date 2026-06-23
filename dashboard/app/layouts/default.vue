@@ -127,7 +127,14 @@ const currentRouteName = computed(() => {
   return 'Application'
 })
 
-const logout = () => {
-  // Add logout logic here
+const logout = async () => {
+  try {
+    await $fetch('/api/auth/logout', { method: 'POST' })
+    const authState = useState('auth')
+    authState.value = { authenticated: false, user: null }
+    navigateTo('/login')
+  } catch (error) {
+    console.error('Logout failed:', error)
+  }
 }
 </script>

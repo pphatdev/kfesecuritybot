@@ -153,12 +153,13 @@ function getBadgeText(strikes) {
 
 // Generate a deterministic gradient background based on username for beautiful avatars
 function getAvatarStyle(username) {
+  if (!username) return {}
   let hash = 0
   for (let i = 0; i < username.length; i++) {
     hash = username.charCodeAt(i) + ((hash << 5) - hash)
   }
-  const c1 = `hsl(${hash % 360}, 65%, 45%)`
-  const c2 = `hsl(${(hash + 60) % 360}, 65%, 35%)`
+  const c1 = `hsl(${Math.abs(hash) % 360}, 65%, 45%)`
+  const c2 = `hsl(${(Math.abs(hash) + 60) % 360}, 65%, 35%)`
   return {
     background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`
   }

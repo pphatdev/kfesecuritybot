@@ -2,9 +2,9 @@
   "spam": [],
   "toxic": [],
   "sticker": [
-    "pack:naked_aquamarine_coyote_by_fstikbot",
     "pack:watfauck_by_Stickers_Maker_Robot",
-    "pack:dx215_by_fstikbot"
+    "pack:dx215_by_fstikbot",
+    "emoji:Naked_Aquamarine_Coyote_by_fStikBot"
   ],
   "pattern": [
     "\\b(?:\\+?\\d{1,3}[-.\\s]?)?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{3,4}\\b",
@@ -136,6 +136,10 @@
     "អា[\\sក-អ]*ប្រកាច់",
     "មី[\\sក-អ]*ឆ្កួត",
     "[\\sក-អ]*ងាប់[\\sក-អ]*",
-    "ក្ដិត[\\sក-អ]*"
+    "ក្ដិត[\\sក-អ]*",
+    {
+      "word": "kak[\\s]*bot",
+      "response": "កំជេរ Bot អី Bot ចេះខឹង"
+    }
   ]
 }

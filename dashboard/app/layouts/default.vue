@@ -27,6 +27,10 @@
               <IconSpeakerphone class="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
               Announcements
             </NuxtLink>
+            <NuxtLink to="/settings" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[14px] font-medium transition-all duration-200 text-(--text-body) hover:bg-primary-subtle hover:text-primary group" active-class="bg-primary-subtle text-primary font-semibold shadow-sm">
+              <IconSettings class="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
+              Settings
+            </NuxtLink>
           </nav>
         </div>
       </div>
@@ -102,7 +106,8 @@ import {
   IconChevronRight,
   IconSun,
   IconMoon,
-  IconSpeakerphone
+  IconSpeakerphone,
+  IconSettings
 } from '@tabler/icons-vue'
 
 const route = useRoute()

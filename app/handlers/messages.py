@@ -1,4 +1,5 @@
 import logging
+import time
 from collections import defaultdict
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -8,6 +9,7 @@ from app.handlers.commands import _bot_intro_html
 from app.services.stats import increment_scanned, log_violation, get_user_strikes
 from app.services.users_db import track_user
 from app.services.groups_db import track_group
+from app.services.settings_db import get_setting, get_group_delay
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,10 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             logger.info(f"Bot removed from group: {chat.title} ({chat.id})")
             # Optionally, you could untrack the group, but keeping it is fine.
 
+# In-memory dictionary to track user's last message time per chat
+# Format: {(chat_id, user_id): timestamp_in_seconds}
+user_last_message = {}
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process incoming messages. Handles mentions, keyword filter, and AI detection."""
     message = update.message or update.channel_post
@@ -34,14 +40,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
         
-    # Track the user who sent the message
-    if message.from_user:
-        track_user(message.from_user.id, message.from_user.username)
-    # Track the group if it's not a private chat
-    if message.chat and message.chat.type != "private":
-        track_group(message.chat.id, message.chat.title)
-        
-    # Extract text from normal messages, captions, or sticker emojis
+    # --- 1. Extract Text First ---
     text = message.text or message.caption or ""
     if message.sticker:
         # Exception: Do NOT block the sticker if its emoji is 🙂
@@ -58,7 +57,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
-    # Increment real-time scanned count
+    bot_username = context.bot.username or ""
+    text_lower = text.lower().strip()
+    normalized_text = " ".join(text_lower.split())
+
+    # --- 2. Check Admin Commands (Bypasses slow mode) ---
+    if message.reply_to_message and bot_username and normalized_text == f"@{bot_username.lower()} delete this":
+        from app.handlers.admin import _is_caller_admin
+        if await _is_caller_admin(update, context):
+            try:
+                await message.reply_to_message.delete()
+                await message.delete()
+                logger.info("Message deleted by admin command")
+            except Exception as e:
+                logger.warning(f"Failed to delete message via command: {e}")
+        else:
+            await message.reply_text("⛔ You are not authorized to use this command.")
+        return
+
+    # --- 3. Track User & Group ---
+    if message.from_user:
+        track_user(message.from_user.id, message.from_user.username)
+        
+    if message.chat and message.chat.type != "private":
+        track_group(message.chat.id, message.chat.title)
+        
+        # --- 4. Enforce Slow Mode ---
+        if message.from_user:
+            delay = get_group_delay(message.chat.id)
+            if delay > 0:
+                chat_id = message.chat.id
+                user_id = message.from_user.id
+                now = time.time()
+                last_time = user_last_message.get((chat_id, user_id), 0)
+                
+                if now - last_time < delay:
+                    try:
+                        await message.delete()
+                        logger.info(f"Deleted fast message from {user_id} in {chat_id} (enforcing {delay}s delay)")
+                    except Exception as e:
+                        logger.warning(f"Could not delete fast message: {e}")
+                    return
+                
+                # Record the valid message time
+                user_last_message[(chat_id, user_id)] = now
+
+    # --- 5. Increment Stats & Log ---
     increment_scanned()
 
     if message.from_user:
@@ -69,24 +113,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = "Unknown"
         
     logger.info(f"Received message from @{username}: {text[:80]}")
-
-    # --- Step 0: Check if the bot is mentioned or greeted ---
-    bot_username = context.bot.username or ""
-    text_lower = text.lower().strip()
-    
-    # Check for "delete this" command
-    if message.reply_to_message and bot_username and text_lower == f"@{bot_username.lower()} delete this":
-        from app.handlers.admin import _is_caller_admin
-        if await _is_caller_admin(update, context):
-            try:
-                await message.reply_to_message.delete()
-                await message.delete()
-                logger.info(f"Message deleted by admin command: {username}")
-            except Exception as e:
-                logger.warning(f"Failed to delete message via command: {e}")
-        else:
-            await message.reply_text("⛔ You are not authorized to use this command.")
-        return
 
     # It counts as a "mention" if:
     # 1. The bot's username is in the text

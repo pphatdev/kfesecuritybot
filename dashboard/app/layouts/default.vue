@@ -4,7 +4,7 @@
     <aside class="w-[260px] bg-(--bg-card) border-r border-(--border-color) shrink-0 flex-col transition-all duration-300 z-20 hidden md:flex shadow-(--shadow-sm)">
       <div class="h-16 flex items-center px-6 border-b border-(--border-color)">
         <IconShield class="w-8 h-8 text-primary mr-3" />
-        <span class="font-heading font-bold text-[18px] text-(--text-heading) leading-tight tracking-tight">BotControl ERP</span>
+        <span class="font-heading font-bold text-[18px] text-(--text-heading) leading-tight tracking-tight">K'Fe SecBot</span>
       </div>
       
       <div class="p-4 flex-1">

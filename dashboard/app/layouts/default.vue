@@ -107,7 +107,8 @@ import {
   IconSun,
   IconMoon,
   IconSpeakerphone,
-  IconSettings
+  IconSettings,
+  IconUsers
 } from '@tabler/icons-vue'
 
 const route = useRoute()
@@ -142,6 +143,7 @@ const currentRouteName = computed(() => {
   if (route.path.includes('/keywords')) return 'Keyword Manager'
   if (route.path.includes('/violations')) return 'User Violations'
   if (route.path.includes('/announce')) return 'Announcements'
+  if (route.path.includes('/settings')) return 'Bot Settings'
   return 'Application'
 })
 

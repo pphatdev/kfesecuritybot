@@ -1,4 +1,6 @@
 # 🛡️ Telegram Moderation Bot & Dashboard
+<img width="1857" height="1077" alt="image" src="https://github.com/user-attachments/assets/056e84e7-3d48-4888-a723-a0195d53c9cf" />
+
 
 A powerful, highly-customizable Telegram moderation bot and full-stack Nuxt 3 web dashboard designed to silently monitor chats, automatically delete **Spam** and **Toxic** content, enforce slow modes, and allow admins to seamlessly broadcast announcements.
 

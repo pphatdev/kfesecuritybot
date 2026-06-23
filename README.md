@@ -1,13 +1,14 @@
-# 🛡️ Telegram AI Moderation Bot
+# 🛡️ Telegram Moderation Bot & Dashboard
 
-A powerful, highly-customizable Telegram group moderation bot designed to silently monitor chats and automatically delete **Spam** and **Toxic** content.
+A powerful, highly-customizable Telegram moderation bot and full-stack Nuxt 3 web dashboard designed to silently monitor chats, automatically delete **Spam** and **Toxic** content, enforce slow modes, and allow admins to seamlessly broadcast announcements.
 
-It supports **English** and **Khmer** languages out of the box, tracks repeat offenders, and allows group admins to manage the blocklist directly via chat commands without ever needing to restart the bot!
+It supports **English** and **Khmer** languages out of the box, tracks repeat offenders, and features a secure, OTP-based web dashboard for total control!
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
+### 🤖 Bot Moderation
 - ⚡ **Instant Keyword Detection**: Checks messages against a live JSON database of spam/toxic keywords.
 - 🇰🇭 **Multi-language Support**: Built-in protection for both English and Khmer (ភាសាខ្មែរ) profanity and scams.
 - 🖼️ **Media & Sticker Scanning**: 
@@ -15,91 +16,97 @@ It supports **English** and **Khmer** languages out of the box, tracks repeat of
   - Checks the hidden emoji associated with Telegram Stickers.
   - Blocks entire malicious sticker packs by their internal name (with configurable safe-emoji exceptions).
 - 👮 **Repeat Offender Tracking**: Keeps track of how many times a user has violated the rules. On their 4th violation, the bot publicly calls them out! (e.g., "ជោរម្លេះ?").
-- ⚙️ **Live Admin Controls**: Add or remove blocked words directly via Telegram commands. Changes are saved to disk instantly.
-- 🛡️ **Corporate Proxy Support**: Built-in global SSL verification bypass to run flawlessly behind strict corporate firewalls (like FortiGuard).
+- ⏱️ **Per-Group Slow Mode**: Enforces custom rate limits (e.g., 1 message every 5 seconds) independently for different groups to prevent rapid-fire spam. Fast messages are silently deleted.
+- 🧹 **Admin Mentions**: Group admins can reply to any message with `@BotName delete this` or `@BotName remove this` to instantly delete the offending message and their command.
 - 💬 **Smart Replies**: Politely introduces itself when mentioned, directly replied to, or greeted (e.g., "hi", "hello", "សួស្តី").
+- 🛡️ **Corporate Proxy Support**: Built-in global SSL verification bypass to run flawlessly behind strict corporate firewalls.
+
+### 🌐 Nuxt 3 Web Dashboard
+- 🔑 **Secure OTP Authentication**: Dashboard access is restricted to authorized users. The bot securely sends a One-Time Password (OTP) to your Telegram account to log in.
+- 📊 **Real-time Statistics**: View total scanned messages, blocked spam, and active users.
+- ⚙️ **Keyword Engine**: Visually manage your blocked toxic and spam keywords. Add, remove, or modify keywords on the fly without restarting the bot.
+- 📢 **Broadcast Announcements**: Send beautifully formatted announcements (with quick-select templates) directly to your monitored Groups, Channels, and Private Chats.
+- ⚠️ **Violations Logs**: Review a history of removed messages, who sent them, and why they were blocked.
+- 🕒 **Bot Settings**: Configure your Per-Group Slow Mode delays via a modern visual interface.
 
 ---
 
 ## 🛠️ Installation & Setup
 
-1. **Clone the repository and enter the directory**:
+1. **Clone the repository**:
    ```bash
+   git clone https://github.com/your-repo/detected-bot.git
    cd detected-bot
    ```
 
-2. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure Environment Variables**:
-   Create a `.env` file in the root directory and add your Telegram Bot Token:
+2. **Configure Environment Variables**:
+   Create a `.env` file in the root directory and add your configurations:
    ```env
    TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+   DASHBOARD_ADMINS=your_telegram_username
+   NUXT_SESSION_PASSWORD=a_secure_random_string_at_least_32_characters_long
    ```
 
-4. **Run the Bot**:
+3. **Start the Telegram Bot (Python)**:
    ```bash
+   pip install -r requirements.txt
    python -m app.main
+   ```
+
+4. **Start the Dashboard (Node.js)**:
+   ```bash
+   cd dashboard
+   npm install
+   npm run dev
    ```
 
 ---
 
 ## 🎮 Admin Commands
 
-Group Administrators and Owners can use the following commands to manage the bot's behavior in real-time. Regular users will be denied access.
+Group Administrators and the Bot Owner can use the following commands within Telegram to manage access and rules.
 
 | Command | Description | Example |
 |---|---|---|
-| `/addword toxic <word>` | Add a toxic/profanity keyword | `/addword toxic scammer` |
-| `/addword spam <word>` | Add a spam/promo keyword | `/addword spam free money` |
-| `/removeword <word>` | Remove any keyword from the list | `/removeword scammer` |
-| `/keywords` | List all custom keywords | `/keywords` |
+| `/adduser <user>` | Grant a user access to the Dashboard | `/adduser @admin_user` |
+| `/removeuser <user>` | Revoke Dashboard access | `/removeuser @admin_user` |
+| `@BotName delete this` | (Reply) Instantly delete a message | `@KfeSecurityBot delete this` |
+| `@BotName remove this` | (Reply) Instantly delete a message | `@KfeSecurityBot remove this` |
 
-*(Note: Built-in keywords and admin-added keywords are stored safely in `data/custom_keywords.json`.)*
+*(Note: Legacy `/addword` and `/removeword` commands have been largely replaced by the visual Web Dashboard's Keyword Engine, but remain accessible.)*
 
 ---
 
 ## 🏗️ Project Structure
 
 ```text
-detected-bot/
+kfesecuritybot/
 ├── app/
 │   ├── main.py                 # Bot entry point and routing
-│   ├── config.py               # Environment variables config
-│   ├── handlers/
-│   │   ├── admin.py            # /addword, /removeword logic
-│   │   ├── commands.py         # /start, /help logic
-│   │   └── messages.py         # Core message scanning & deletion logic
-│   └── services/
-│       ├── keywords.py         # JSON storage manager
-│       └── detector_service.py # Legacy AI integration
-├── data/
-│   └── custom_keywords.json    # Live database of blocked words
+│   ├── handlers/               # Command, message, and admin logic
+│   └── services/               # Bot services (db managers, keywords)
+├── dashboard/                  # Nuxt 3 Vue Application
+│   ├── app/                    # Frontend Vue pages and layouts
+│   ├── server/                 # Backend Nitro API endpoints
+│   └── nuxt.config.ts          # Nuxt configuration
+├── data/                       # Flat-file JSON databases
+│   ├── custom_keywords.json    # Blocked keywords
+│   ├── groups.json             # Tracked groups & channels
+│   ├── users.json              # Tracked private users
+│   ├── allowed_users.json      # Dashboard authorized users
+│   ├── otps.json               # Temporary authentication OTPs
+│   └── settings.json           # Per-group slow mode settings
 ├── .env                        # Secrets (Not tracked in Git)
 └── requirements.txt            # Python dependencies
 ```
 
 ---
 
-## 💡 How Detection Works
-
-1. A user sends a message, photo, or sticker.
-2. The bot extracts the text, caption, or sticker emoji/pack name.
-3. If it matches an exact greeting (e.g., "Hello"), the bot replies with its intro.
-4. The text is checked against the live `custom_keywords.json` list.
-5. If a match is found (e.g., "crypto", "🖕"), the message is instantly deleted and the group is notified.
-6. The user gets a strike. If they reach 4 strikes, they receive a special public warning.
-
----
-
 ## 🚀 Deployment (Ubuntu)
 
-This project includes an automated deployment script for Ubuntu servers using native **Systemd** and **Nginx** (No Docker or PM2 required).
+This project includes an automated deployment script for Ubuntu servers using native **Systemd** and **Nginx**.
 
-### Steps to Deploy
-1. Clone this repository into your target folder (default: `/var/www/pphat/pphat.me/kfesecuritybot`):
+1. Clone this repository into your target folder:
    ```bash
    git clone <repository-url> /var/www/pphat/pphat.me/kfesecuritybot
    cd /var/www/pphat/pphat.me/kfesecuritybot
@@ -117,14 +124,9 @@ This project includes an automated deployment script for Ubuntu servers using na
    sudo ./deployment/ubuntu/setup.sh
    ```
 
-This script will automatically:
-- Install Python 3, Node.js (20.x), and Nginx.
-- Setup the Python Bot background service.
-- Build and start the Nuxt web dashboard on port 3105.
-- Setup an Nginx reverse proxy to expose the dashboard on port 80.
+This script will automatically install dependencies, build the Nuxt app, setup the Python Bot background service, and create an Nginx reverse proxy to expose the dashboard.
 
 ### Managing Services
-You can manage the bot and dashboard using standard systemd commands:
 ```bash
 sudo systemctl status bot
 sudo systemctl status dashboard

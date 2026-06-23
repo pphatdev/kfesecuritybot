@@ -105,6 +105,11 @@ const isDark = ref(true)
 
 const toggleTheme = () => {
   isDark.value = !isDark.value
+  applyTheme()
+  localStorage.setItem('botcontrol-theme', isDark.value ? 'dark' : 'light')
+}
+
+const applyTheme = () => {
   if(isDark.value) {
     document.documentElement.setAttribute('data-bs-theme', 'dark')
     document.documentElement.classList.add('dark')
@@ -115,9 +120,11 @@ const toggleTheme = () => {
 }
 
 onMounted(() => {
-  // Set initial theme
-  document.documentElement.setAttribute('data-bs-theme', 'dark')
-  document.documentElement.classList.add('dark')
+  const savedTheme = localStorage.getItem('botcontrol-theme')
+  if (savedTheme) {
+    isDark.value = savedTheme === 'dark'
+  }
+  applyTheme()
 })
 
 const currentRouteName = computed(() => {
@@ -127,7 +134,14 @@ const currentRouteName = computed(() => {
   return 'Application'
 })
 
-const logout = () => {
-  // Add logout logic here
+const logout = async () => {
+  try {
+    await $fetch('/api/auth/logout', { method: 'POST' })
+    const authState = useState('auth')
+    authState.value = { authenticated: false, user: null }
+    navigateTo('/login')
+  } catch (error) {
+    console.error('Logout failed:', error)
+  }
 }
 </script>

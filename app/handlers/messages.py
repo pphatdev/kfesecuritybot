@@ -6,6 +6,7 @@ from telegram.error import BadRequest, Forbidden
 from app.services.keywords import pre_check
 from app.handlers.commands import _bot_intro_html
 from app.services.stats import increment_scanned, log_violation, get_user_strikes
+from app.services.users_db import track_user
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process incoming messages. Handles mentions, keyword filter, and AI detection."""
     message = update.message
     
+    # Track the user who sent the message
+    if message.from_user:
+        track_user(message.from_user.id, message.from_user.username)
+        
     # Extract text from normal messages, captions, or sticker emojis
     text = message.text or message.caption or ""
     if message.sticker:

@@ -1,5 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
+from app.services.users_db import track_user
 
 
 def _bot_intro_html(user_mention: str) -> str:
@@ -16,11 +17,14 @@ def _bot_intro_html(user_mention: str) -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     user = update.effective_user
+    track_user(user.id, user.username)
     await update.message.reply_html(_bot_intro_html(user.mention_html()))
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /help is issued."""
+    user = update.effective_user
+    track_user(user.id, user.username)
     await update.message.reply_html(
         "ℹ️ <b>Help</b>\n\n"
         "I monitor group messages and remove harmful content automatically based on patterns configured in the web dashboard.\n\n"

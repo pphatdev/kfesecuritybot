@@ -62,7 +62,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     normalized_text = " ".join(text_lower.split())
 
     # --- 2. Check Admin Commands (Bypasses slow mode) ---
-    if message.reply_to_message and bot_username and normalized_text == f"@{bot_username.lower()} delete this":
+    if message.reply_to_message and bot_username and (
+        normalized_text == f"@{bot_username.lower()} delete this" or 
+        normalized_text == f"@{bot_username.lower()} remove this"
+    ):
         from app.handlers.admin import _is_caller_admin
         if await _is_caller_admin(update, context):
             try:

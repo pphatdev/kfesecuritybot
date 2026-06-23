@@ -45,6 +45,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username or ""
     text_lower = text.lower().strip()
     
+    # Check for "delete this" command
+    if message.reply_to_message and bot_username and text_lower == f"@{bot_username.lower()} delete this":
+        from app.handlers.admin import _is_caller_admin
+        if await _is_caller_admin(update, context):
+            try:
+                await message.reply_to_message.delete()
+                await message.delete()
+                logger.info(f"Message deleted by admin command: {username}")
+            except Exception as e:
+                logger.warning(f"Failed to delete message via command: {e}")
+        else:
+            await message.reply_text("⛔ You are not authorized to use this command.")
+        return
+
     # It counts as a "mention" if:
     # 1. The bot's username is in the text
     # 2. The user is replying directly to one of the bot's messages

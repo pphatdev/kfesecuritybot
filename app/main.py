@@ -16,8 +16,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from app.config import config
 from app.handlers.commands import start_command, help_command
 from app.handlers.messages import handle_message
-from app.handlers.admin import login_command, adduser_command, removeuser_command
-
+from app.handlers.admin import adduser_command, removeuser_command
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -41,7 +40,6 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
 
     # Admin commands (dashboard access management)
-    application.add_handler(CommandHandler("login", login_command))
     application.add_handler(CommandHandler("adduser", adduser_command))
     application.add_handler(CommandHandler("removeuser", removeuser_command))
 

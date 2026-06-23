@@ -139,7 +139,23 @@
     "ក្ដិត[\\sក-អ]*",
     {
       "word": "kak[\\s]*bot",
-      "response": "កំជេរ Bot អី Bot ចេះខឹង"
+      "response": "ធ្វើឱ្យ Bot ខឹង 😒"
+    },
+    {
+      "word": "kakbot",
+      "response": "Bot គ្មានកំហុសទេ"
+    },
+    {
+      "word": "jkj bot",
+      "response": "ជេរ Bot ⚠️"
+    },
+    {
+      "word": "𝚓𝚔𝚓 𝚋𝚘𝚝",
+      "response": "ហានជេរ Bot 😡"
+    },
+    {
+      "word": "ʲᵏʲ ᵇᵒᵗ",
+      "response": "ធ្វើឱ្យ Bot ខឹង 😒"
     }
   ]
 }

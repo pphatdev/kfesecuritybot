@@ -66,6 +66,8 @@ async def check_and_send_scheduled_messages(application: Application):
             
             chat_ids = msg.get("chatIds", [])
             text = msg.get("message", "")
+            file_path = msg.get("file_path")
+            file_type = msg.get("file_type")
             
             results = {}
             success_count = 0
@@ -73,11 +75,20 @@ async def check_and_send_scheduled_messages(application: Application):
             
             for chat_id in chat_ids:
                 try:
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=text,
-                        parse_mode="HTML"
-                    )
+                    if file_path and os.path.exists(file_path):
+                        with open(file_path, 'rb') as media_file:
+                            if file_type == 'photo':
+                                await application.bot.send_photo(chat_id=chat_id, photo=media_file, caption=text, parse_mode="HTML")
+                            elif file_type == 'video':
+                                await application.bot.send_video(chat_id=chat_id, video=media_file, caption=text, parse_mode="HTML")
+                            else:
+                                await application.bot.send_document(chat_id=chat_id, document=media_file, caption=text, parse_mode="HTML")
+                    else:
+                        await application.bot.send_message(
+                            chat_id=chat_id,
+                            text=text,
+                            parse_mode="HTML"
+                        )
                     results[str(chat_id)] = {"success": True}
                     success_count += 1
                 except Exception as e:
@@ -109,6 +120,13 @@ async def check_and_send_scheduled_messages(application: Application):
             messages = latest_messages
             save_scheduled_messages(messages)
             modified = False
+            
+            # Clean up the file if it existed
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception as e:
+                    logger.error(f"Failed to delete scheduled media file {file_path}: {e}")
 
     if modified:
         save_scheduled_messages(messages)

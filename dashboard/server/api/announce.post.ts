@@ -1,12 +1,35 @@
 export default defineEventHandler(async (event) => {
   try {
-    const body = await readBody(event)
-    const { chatIds, message } = body
+    let message = ''
+    let chatIds: string[] = []
+    let fileData: any = null
 
-    if (!message || typeof message !== 'string') {
+    // Check content type to see if it's multipart
+    const contentType = getRequestHeader(event, 'content-type') || ''
+    
+    if (contentType.includes('multipart/form-data')) {
+      const multipart = await readMultipartFormData(event)
+      if (multipart) {
+        for (const field of multipart) {
+          if (field.name === 'message') {
+            message = field.data.toString('utf-8')
+          } else if (field.name === 'chatIds') {
+            chatIds.push(field.data.toString('utf-8'))
+          } else if (field.name === 'file') {
+            fileData = field
+          }
+        }
+      }
+    } else {
+      const body = await readBody(event)
+      message = body.message
+      chatIds = Array.isArray(body.chatIds) ? body.chatIds : [body.chatIds]
+    }
+
+    if (!fileData && (!message || typeof message !== 'string')) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Message is required'
+        statusMessage: 'Message is required when no file is attached'
       })
     }
 
@@ -27,20 +50,47 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const results = []
+    let apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
+    let method = 'sendMessage'
+    let mediaType = ''
     
+    if (fileData) {
+      const mime = fileData.type || ''
+      if (mime.startsWith('image/')) {
+        method = 'sendPhoto'
+        mediaType = 'photo'
+      } else if (mime.startsWith('video/')) {
+        method = 'sendVideo'
+        mediaType = 'video'
+      } else {
+        method = 'sendDocument'
+        mediaType = 'document'
+      }
+      apiUrl = `https://api.telegram.org/bot${botToken}/${method}`
+    }
+
     // Send to each chat concurrently using Promise.allSettled
     const requests = chatIds.map(async (chatId) => {
-      const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let fetchOptions: any = { method: 'POST' }
+
+      if (fileData) {
+        const fd = new FormData()
+        fd.append('chat_id', chatId)
+        fd.append('caption', message)
+        fd.append('parse_mode', 'HTML')
+        const blob = new Blob([fileData.data], { type: fileData.type || 'application/octet-stream' })
+        fd.append(mediaType, blob, fileData.filename || 'file')
+        fetchOptions.body = fd
+      } else {
+        fetchOptions.headers = { 'Content-Type': 'application/json' }
+        fetchOptions.body = JSON.stringify({
           chat_id: chatId,
           text: message,
-          parse_mode: 'HTML' // You could use HTML or Markdown depending on preference
+          parse_mode: 'HTML'
         })
-      })
+      }
 
+      const tgResponse = await fetch(apiUrl, fetchOptions)
       const tgResult = await tgResponse.json()
       if (!tgResponse.ok || !tgResult.ok) {
         throw new Error(tgResult.description || 'Unknown Telegram API error')

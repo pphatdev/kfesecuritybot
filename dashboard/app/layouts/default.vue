@@ -1,7 +1,13 @@
 <template>
   <div class="min-h-screen bg-(--bg-layout) text-(--text-body) flex font-sans" :data-bs-theme="isDark ? 'dark' : 'light'">
+    <!-- Mobile Sidebar Overlay -->
+    <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity duration-300"></div>
+
     <!-- Sidebar -->
-    <aside class="w-[260px] bg-(--bg-card) border-r border-(--border-color) shrink-0 flex-col transition-all duration-300 z-20 hidden md:flex shadow-(--shadow-sm)">
+    <aside :class="[
+      'w-[260px] bg-(--bg-card) border-r border-(--border-color) shrink-0 flex-col transition-transform duration-300 z-30 shadow-(--shadow-sm) fixed md:relative inset-y-0 left-0 md:translate-x-0 flex',
+      isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+    ]">
       <div class="h-16 flex items-center px-6 border-b border-(--border-color)">
         <IconShield class="w-8 h-8 text-primary mr-3" />
         <span class="font-heading font-bold text-[18px] text-(--text-heading) leading-tight tracking-tight">K'Fe SecBot</span>
@@ -48,7 +54,7 @@
       <!-- Topbar -->
       <header class="h-[64px] bg-(--bg-card) border-b border-(--border-color) flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-(--shadow-sm) z-10">
         <div class="flex items-center gap-4">
-          <button class="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-(--text-muted)">
+          <button @click="isSidebarOpen = !isSidebarOpen" class="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-(--text-muted)">
             <IconMenu2 class="w-6 h-6" />
           </button>
           <div class="hidden sm:flex items-center text-sm font-medium text-(--text-muted)">
@@ -93,7 +99,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { 
   IconShield, 
@@ -113,6 +119,11 @@ import {
 
 const route = useRoute()
 const isDark = ref(true)
+const isSidebarOpen = ref(false)
+
+watch(() => route.path, () => {
+  isSidebarOpen.value = false
+})
 
 const toggleTheme = () => {
   isDark.value = !isDark.value

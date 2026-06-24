@@ -109,11 +109,75 @@
                 rows="8"
                 placeholder="Enter your announcement here... HTML formatting (<b>, <i>, <a>, <code>) is fully supported."
                 class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-3 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-inner"
-                required
+                :required="!attachedFile"
               ></textarea>
               <div class="flex justify-between items-center text-xs text-(--text-muted) px-1">
                 <span>Supports Telegram HTML syntax</span>
                 <span :class="{'text-danger font-medium': message.length > 4000}">{{ message.length }} / 4000</span>
+              </div>
+            </div>
+
+            <!-- Media Upload -->
+            <div class="mt-6 border-t border-(--border-color) pt-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Attach Media <span class="normal-case font-normal text-[10px]">(Optional, Max 50MB)</span></label>
+              </div>
+              
+              <input 
+                type="file" 
+                ref="fileInput" 
+                @change="handleFileChange" 
+                class="hidden" 
+                accept="image/*,video/*,application/pdf,application/zip,.doc,.docx,.xls,.xlsx"
+              />
+
+              <!-- Default Upload State -->
+              <div v-if="!attachedFile" 
+                   @click="triggerFileInput"
+                   class="border-2 border-dashed border-(--border-color) hover:border-primary/50 bg-(--bg-layout) hover:bg-primary-subtle/30 rounded-xl p-6 transition-all flex flex-col items-center justify-center cursor-pointer group"
+              >
+                <div class="w-12 h-12 bg-slate-500/10 group-hover:bg-primary/10 rounded-full flex items-center justify-center mb-3 transition-colors">
+                  <IconPaperclip class="w-6 h-6 text-(--text-muted) group-hover:text-primary transition-colors" />
+                </div>
+                <p class="text-sm font-medium text-(--text-heading)">Click to upload a file</p>
+                <p class="text-xs text-(--text-muted) mt-1">Images, videos, or documents</p>
+              </div>
+
+              <!-- Media Preview State -->
+              <div v-else class="relative rounded-xl border border-(--border-color) shadow-sm bg-(--bg-card) overflow-hidden group">
+                <!-- Remove Button Overlay -->
+                <button 
+                  type="button" 
+                  @click.prevent="removeFile" 
+                  class="absolute top-2 right-2 z-10 w-8 h-8 bg-black/50 hover:bg-danger/80 backdrop-blur-sm text-white rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-sm cursor-pointer"
+                  title="Remove attachment"
+                >
+                  <IconX class="w-4 h-4" />
+                </button>
+
+                <!-- Image/Video Preview -->
+                <div v-if="previewUrl" class="w-full flex items-center justify-center bg-black/5 relative max-h-[300px]">
+                  <img v-if="attachedFile.type.startsWith('image/')" :src="previewUrl" class="w-full h-full object-contain max-h-[300px]" alt="Attachment preview" />
+                  <video v-if="attachedFile.type.startsWith('video/')" :src="previewUrl" controls class="w-full h-full object-contain max-h-[300px]"></video>
+                </div>
+                
+                <!-- Document Preview (No URL) -->
+                <div v-else class="w-full flex items-center justify-center bg-slate-500/5 py-12">
+                   <IconFileDescription class="w-16 h-16 text-(--text-muted) opacity-50" />
+                </div>
+
+                <!-- File Info Footer -->
+                <div class="p-3 bg-(--bg-card) border-t border-(--border-color) flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-primary-subtle text-primary flex items-center justify-center shrink-0">
+                    <IconPhoto v-if="attachedFile.type.startsWith('image/')" class="w-5 h-5" />
+                    <IconMovie v-else-if="attachedFile.type.startsWith('video/')" class="w-5 h-5" />
+                    <IconFileDescription v-else class="w-5 h-5" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
+                    <span class="text-sm font-semibold text-(--text-heading) truncate">{{ attachedFile.name }}</span>
+                    <span class="text-xs text-(--text-muted) font-mono">{{ formatFileSize(attachedFile.size) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -342,7 +406,7 @@
           <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
              <button 
                 type="submit" 
-                :disabled="sending || !message.trim() || selectedGroups.length === 0 || (activeTab === 'schedule' && !scheduleTime)"
+                :disabled="sending || (!message.trim() && !attachedFile) || selectedGroups.length === 0 || (activeTab === 'schedule' && !scheduleTime)"
                 class="w-full py-3.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-hover focus:ring-4 focus:ring-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
               >
                 <IconSend v-if="!sending && activeTab === 'send'" class="w-5 h-5" />
@@ -521,7 +585,11 @@ import {
   IconAlertTriangle,
   IconChevronLeft,
   IconChevronRight,
-  IconChevronDown
+  IconChevronDown,
+  IconPaperclip,
+  IconPhoto,
+  IconMovie,
+  IconFileDescription
 } from '@tabler/icons-vue'
 
 const message = ref('')
@@ -530,6 +598,57 @@ const searchQuery = ref('')
 const error = ref('')
 const success = ref('')
 const sending = ref(false)
+const attachedFile = ref(null)
+const previewUrl = ref(null)
+const fileInput = ref(null)
+
+const triggerFileInput = () => {
+  if (fileInput.value) {
+    fileInput.value.click()
+  }
+}
+
+const handleFileChange = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    if (file.size > 50 * 1024 * 1024) {
+      error.value = 'File size exceeds 50MB limit.'
+      attachedFile.value = null
+      if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+      previewUrl.value = null
+      return
+    }
+    attachedFile.value = file
+    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      previewUrl.value = URL.createObjectURL(file)
+    } else {
+      previewUrl.value = null
+    }
+  }
+}
+
+const removeFile = () => {
+  attachedFile.value = null
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+  }
+}
+
+onBeforeUnmount(() => {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+})
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 
 const announcementTemplates = [
   {
@@ -906,7 +1025,7 @@ const deleteScheduleHistory = async (id) => {
 }
 
 const sendAnnouncement = async () => {
-  if (!message.value.trim() || selectedGroups.value.length === 0) return
+  if ((!message.value.trim() && !attachedFile.value) || selectedGroups.value.length === 0) return
   if (activeTab.value === 'schedule' && !scheduleTime.value) return
   
   error.value = ''
@@ -914,21 +1033,30 @@ const sendAnnouncement = async () => {
   sending.value = true
   
   try {
+    const formData = new FormData()
+    formData.append('message', message.value)
+    selectedGroups.value.forEach(id => formData.append('chatIds', id))
+    if (attachedFile.value) {
+      formData.append('file', attachedFile.value)
+    }
+
     if (activeTab.value === 'schedule') {
       const utcString = new Date(scheduleTime.value).toISOString()
+      formData.append('sendAt', utcString)
       
       const res = await $fetch('/api/schedule', {
         method: 'POST',
-        body: {
-          message: message.value,
-          chatIds: selectedGroups.value,
-          sendAt: utcString
-        }
+        body: formData
       })
       if (res.success) {
         message.value = ''
         selectedGroups.value = []
         scheduleTime.value = ''
+        attachedFile.value = null
+        if (previewUrl.value) {
+          URL.revokeObjectURL(previewUrl.value)
+          previewUrl.value = null
+        }
         success.value = 'Announcement successfully scheduled.'
         router.push({ query: { tab: 'queue' } })
         await fetchSchedules()
@@ -936,15 +1064,17 @@ const sendAnnouncement = async () => {
     } else {
       const res = await $fetch('/api/announce', {
         method: 'POST',
-        body: {
-          message: message.value,
-          chatIds: selectedGroups.value
-        }
+        body: formData
       })
       
       if (res.success) {
         message.value = ''
         selectedGroups.value = []
+        attachedFile.value = null
+        if (previewUrl.value) {
+          URL.revokeObjectURL(previewUrl.value)
+          previewUrl.value = null
+        }
         success.value = `Successfully broadcasted to ${res.sent} recipient(s).`
         if (res.failed > 0) {
           success.value += ` Failed to send to ${res.failed} recipient(s).`

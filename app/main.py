@@ -17,6 +17,7 @@ from app.config import config
 from app.handlers.commands import start_command, help_command
 from app.handlers.messages import handle_message, handle_my_chat_member
 from app.handlers.admin import adduser_command, removeuser_command
+from app.services.schedule_service import run_scheduler
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -24,6 +25,10 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
+async def post_init(application: Application) -> None:
+    """Run background scheduler task once the bot is initialized."""
+    asyncio.create_task(run_scheduler(application))
 
 def main() -> None:
     """Start the bot."""
@@ -33,7 +38,14 @@ def main() -> None:
         logger.error("Please set your TELEGRAM_BOT_TOKEN in the .env file.")
         return
 
-    application = Application.builder().token(token).build()
+    # Ensure an event loop exists and is set for the current thread (Python 3.12+ / 3.14 compatibility)
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    application = Application.builder().token(token).post_init(post_init).build()
 
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))

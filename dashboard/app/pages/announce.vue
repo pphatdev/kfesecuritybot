@@ -18,155 +18,489 @@
       <span>{{ success }}</span>
     </div>
 
-    <form @submit.prevent="sendAnnouncement" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- Tabs Header -->
+    <div class="flex flex-wrap gap-2 p-1.5 bg-slate-500/5 rounded-xl border border-(--border-color) w-fit mb-6">
+      <NuxtLink 
+        :to="{ query: { tab: 'send' } }"
+        class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        :class="[
+          activeTab === 'send'
+            ? 'bg-primary text-white shadow-sm' 
+            : 'text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10'
+        ]"
+      >
+        <IconSend class="w-4 h-4" />
+        <span>Send Announcement</span>
+      </NuxtLink>
       
-      <!-- Left Column: Compose Message -->
-      <div class="lg:col-span-8 space-y-6">
-        <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5 sm:p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
-              <IconMessageDots class="w-5 h-5 text-primary" />
-              Compose Message
-            </h2>
-          </div>
+      <NuxtLink 
+        :to="{ query: { tab: 'schedule' } }"
+        class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        :class="[
+          activeTab === 'schedule'
+            ? 'bg-primary text-white shadow-sm' 
+            : 'text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10'
+        ]"
+      >
+        <IconCalendarClock class="w-4 h-4" />
+        <span>Schedule for Later</span>
+      </NuxtLink>
+      
+      <NuxtLink 
+        :to="{ query: { tab: 'queue' } }"
+        class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        :class="[
+          activeTab === 'queue'
+            ? 'bg-primary text-white shadow-sm' 
+            : 'text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10'
+        ]"
+      >
+        <IconList class="w-4 h-4" />
+        <span>Scheduled Queue</span>
+        <span 
+          v-if="pendingSchedulesCount > 0" 
+          :class="[
+            'px-2 py-0.5 rounded-full text-xs font-semibold',
+            activeTab === 'queue' ? 'bg-black/20 text-white' : 'bg-slate-500/10 text-(--text-muted)'
+          ]"
+        >
+          {{ pendingSchedulesCount }}
+        </span>
+      </NuxtLink>
+    </div>
 
-          <!-- Templates Quick Picks -->
-          <div class="mb-5">
-            <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider mb-3">Quick Templates</label>
-            <div class="flex flex-wrap gap-2">
-              <button 
-                v-for="tpl in templates" 
-                :key="tpl.name" 
-                type="button"
-                @click="message = tpl.content"
-                class="flex items-center gap-1.5 px-3 py-1.5 bg-(--bg-layout) border border-(--border-color) hover:border-primary hover:text-primary text-xs font-medium rounded-full transition-all text-(--text-body) shadow-sm"
-              >
-                <IconTemplate class="w-3.5 h-3.5 opacity-70" />
-                {{ tpl.name }}
-              </button>
+    <!-- Compose Announcement (Send / Schedule Tabs) -->
+    <div v-if="activeTab === 'send' || activeTab === 'schedule'">
+      <form @submit.prevent="sendAnnouncement" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Column: Compose Message -->
+        <div class="lg:col-span-8 space-y-6">
+          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5 sm:p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
+                <IconMessageDots class="w-5 h-5 text-primary" />
+                Compose Message
+              </h2>
             </div>
-          </div>
 
-          <!-- Textarea -->
-          <div class="space-y-2">
-            <label for="message" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Message Body</label>
-            <textarea 
-              id="message" 
-              v-model="message" 
-              rows="8"
-              placeholder="Enter your announcement here... HTML formatting (<b>, <i>, <a>, <code>) is fully supported."
-              class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-3 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-inner"
-              required
-            ></textarea>
-            <div class="flex justify-between items-center text-xs text-(--text-muted) px-1">
-              <span>Supports Telegram HTML syntax</span>
-              <span :class="{'text-danger font-medium': message.length > 4000}">{{ message.length }} / 4000</span>
+            <!-- Template Selector -->
+            <div class="mb-5 bg-slate-500/5 border border-(--border-color) rounded-lg p-3">
+              <label class="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">Quick-Select Announcement Templates</label>
+              <div class="flex flex-wrap gap-2">
+                <button 
+                  v-for="tpl in announcementTemplates" 
+                  :key="tpl.name"
+                  type="button" 
+                  @click="applyTemplate(tpl.text)"
+                  class="px-3 py-1.5 bg-(--bg-card) hover:bg-slate-500/10 border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-body) hover:text-(--text-heading) transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <component :is="tpl.icon" class="w-3.5 h-3.5 text-primary" />
+                  {{ tpl.name }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Textarea -->
+            <div class="space-y-2">
+              <label for="message" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Message Body</label>
+              <textarea 
+                id="message" 
+                v-model="message" 
+                rows="8"
+                placeholder="Enter your announcement here... HTML formatting (<b>, <i>, <a>, <code>) is fully supported."
+                class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-3 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-inner"
+                required
+              ></textarea>
+              <div class="flex justify-between items-center text-xs text-(--text-muted) px-1">
+                <span>Supports Telegram HTML syntax</span>
+                <span :class="{'text-danger font-medium': message.length > 4000}">{{ message.length }} / 4000</span>
+              </div>
+            </div>
+
+            <!-- DateTime Picker (Only in Schedule Tab) -->
+            <div v-if="activeTab === 'schedule'" class="mt-6 border-t border-(--border-color) pt-5 space-y-2">
+              <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Scheduled Time</label>
+              
+              <div class="relative w-full" ref="pickerContainer">
+                <!-- Trigger Button -->
+                <button 
+                  type="button" 
+                  @click="toggleDropdown"
+                  class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-2.5 text-sm text-(--text-body) text-left focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all flex items-center justify-between shadow-inner cursor-pointer"
+                >
+                  <div class="flex items-center gap-2">
+                    <IconCalendarClock class="w-4 h-4 text-primary" />
+                    <span :class="{'text-(--text-muted)': !scheduleTime}">
+                      {{ formattedScheduleTime || 'Select date & time' }}
+                    </span>
+                  </div>
+                  <IconChevronDown class="w-4 h-4 text-(--text-muted) transition-transform duration-200" :class="{'rotate-180': isDropdownOpen}" />
+                </button>
+                
+                <!-- Popover Dropdown overlay panel -->
+                <div 
+                  v-if="isDropdownOpen" 
+                  class="absolute left-0 mt-2 z-30 bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) p-4 w-[340px] select-none text-left animate-fade-in"
+                >
+                  <!-- Month & Year Selector Header -->
+                  <div class="flex items-center justify-between pb-3 border-b border-(--border-color) mb-3">
+                    <button 
+                      type="button" 
+                      @click="prevMonth" 
+                      class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
+                    >
+                      <IconChevronLeft class="w-4 h-4" />
+                    </button>
+                    <span class="text-sm font-semibold text-(--text-heading)">
+                      {{ monthNames[currentMonth] }} {{ currentYear }}
+                    </span>
+                    <button 
+                      type="button" 
+                      @click="nextMonth" 
+                      class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
+                    >
+                      <IconChevronRight class="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  <!-- Week Days Headers -->
+                  <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                    <span>Su</span>
+                    <span>Mo</span>
+                    <span>Tu</span>
+                    <span>We</span>
+                    <span>Th</span>
+                    <span>Fr</span>
+                    <span>Sa</span>
+                  </div>
+                  
+                  <!-- Calendar Day Cells -->
+                  <div class="grid grid-cols-7 gap-1 text-center">
+                    <div v-for="(cell, idx) in calendarCells" :key="idx" class="aspect-square flex items-center justify-center">
+                      <span v-if="cell.type === 'empty'" class="w-8 h-8"></span>
+                      <button
+                        v-else
+                        type="button"
+                        @click="selectDay(cell)"
+                        :disabled="cell.disabled"
+                        class="w-8 h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer"
+                        :class="[
+                          isSameDay(cell.date, selectedDate)
+                            ? 'bg-primary text-white shadow-sm font-bold'
+                            : cell.disabled
+                              ? 'opacity-25 cursor-not-allowed text-(--text-muted)'
+                              : 'text-(--text-body) hover:bg-slate-500/10 hover:text-(--text-heading)'
+                        ]"
+                      >
+                        {{ cell.day }}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- Time Picker Section -->
+                  <div class="flex items-center justify-between border-t border-(--border-color) pt-3 mt-3">
+                    <span class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">Time</span>
+                    <div class="flex items-center gap-1.5 bg-slate-500/5 px-2.5 py-1 rounded-xl border border-(--border-color)">
+                      <!-- Hour Selector Dropdown -->
+                      <select 
+                        v-model="selectedHour" 
+                        @change="updateScheduleTime" 
+                        class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
+                      >
+                        <option v-for="h in 12" :key="h" :value="h" class="bg-(--bg-card) text-(--text-heading)">{{ String(h).padStart(2, '0') }}</option>
+                      </select>
+                      
+                      <span class="text-(--text-muted) font-semibold">:</span>
+                      
+                      <!-- Minute Selector Dropdown -->
+                      <select 
+                        v-model="selectedMinute" 
+                        @change="updateScheduleTime" 
+                        class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
+                      >
+                        <option v-for="m in 60" :key="m-1" :value="m-1" class="bg-(--bg-card) text-(--text-heading)">{{ String(m-1).padStart(2, '0') }}</option>
+                      </select>
+                      
+                      <!-- AM/PM Toggle Segment -->
+                      <div class="flex border-l border-(--border-color) pl-2 ml-1 gap-1">
+                        <button 
+                          type="button" 
+                          @click="selectedAmPm = 'AM'; updateScheduleTime()"
+                          class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                          :class="selectedAmPm === 'AM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
+                        >
+                          AM
+                        </button>
+                        <button 
+                          type="button" 
+                          @click="selectedAmPm = 'PM'; updateScheduleTime()"
+                          class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                          :class="selectedAmPm === 'PM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
+                        >
+                          PM
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Dropdown Action Footer -->
+                  <div class="flex justify-end mt-3 pt-2 border-t border-(--border-color)">
+                    <button 
+                      type="button" 
+                      @click="isDropdownOpen = false" 
+                      class="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-(--text-muted)">The announcement will be queued and sent automatically at this local time.</p>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Right Column: Select Recipients & Actions -->
-      <div class="lg:col-span-4 space-y-6">
-        
-        <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) flex flex-col h-[500px]">
-          <div class="p-5 border-b border-(--border-color) shrink-0">
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
-                <IconUsers class="w-5 h-5 text-primary" />
-                Recipients
-              </h2>
-              <span class="bg-primary-subtle text-primary text-xs font-bold px-2 py-0.5 rounded-full">
-                {{ selectedGroups.length }} Selected
-              </span>
+        <!-- Right Column: Select Recipients & Actions -->
+        <div class="lg:col-span-4 space-y-6">
+          
+          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) flex flex-col h-[500px]">
+            <div class="p-5 border-b border-(--border-color) shrink-0">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
+                  <IconUsers class="w-5 h-5 text-primary" />
+                  Recipients
+                </h2>
+                <span class="bg-primary-subtle text-primary text-xs font-bold px-2 py-0.5 rounded-full">
+                  {{ selectedGroups.length }} Selected
+                </span>
+              </div>
+
+              <!-- Search / Filter -->
+              <div class="relative">
+                <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+                <input 
+                  type="text" 
+                  v-model="searchQuery" 
+                  placeholder="Search recipients..." 
+                  class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                />
+              </div>
             </div>
 
-            <!-- Search / Filter -->
-            <div class="relative">
-              <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
-              <input 
-                type="text" 
-                v-model="searchQuery" 
-                placeholder="Search recipients..." 
-                class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-              />
-            </div>
-          </div>
+            <!-- Recipient List -->
+            <div class="flex-1 overflow-y-auto p-2">
+              <div v-if="pending" class="flex flex-col items-center justify-center h-full text-(--text-muted)">
+                <IconLoader class="w-6 h-6 animate-spin mb-2" />
+                <span class="text-sm">Loading...</span>
+              </div>
+              
+              <div v-else-if="filteredGroups.length === 0" class="flex flex-col items-center justify-center h-full text-(--text-muted) px-4 text-center">
+                <IconGhost class="w-8 h-8 mb-2 opacity-50" />
+                <span class="text-sm">{{ searchQuery ? 'No recipients found.' : 'No recipients tracked yet.' }}</span>
+              </div>
 
-          <!-- Recipient List -->
-          <div class="flex-1 overflow-y-auto p-2">
-            <div v-if="pending" class="flex flex-col items-center justify-center h-full text-(--text-muted)">
-              <IconLoader class="w-6 h-6 animate-spin mb-2" />
-              <span class="text-sm">Loading...</span>
+              <div v-else class="space-y-1">
+                <label 
+                  v-for="group in filteredGroups" 
+                  :key="group.id"
+                  class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-(--bg-layout) group/item"
+                  :class="{'bg-primary-subtle/30': selectedGroups.includes(group.id)}"
+                >
+                  <div class="relative flex items-center justify-center">
+                    <input 
+                      type="checkbox" 
+                      :value="group.id" 
+                      v-model="selectedGroups"
+                      class="peer sr-only"
+                    />
+                    <div class="w-5 h-5 rounded border-2 border-(--border-color) peer-checked:bg-primary peer-checked:border-primary flex items-center justify-center transition-colors">
+                      <IconCheck class="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" stroke-width="3" />
+                    </div>
+                  </div>
+                  
+                  <div class="flex flex-col overflow-hidden flex-1">
+                    <span class="text-sm font-medium text-(--text-heading) truncate group-hover/item:text-primary transition-colors">{{ group.title }}</span>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <span class="text-[10px] font-bold tracking-widest uppercase" :class="group.type === 'Private Chat' ? 'text-blue-500' : 'text-emerald-500'">
+                        {{ group.type }}
+                      </span>
+                      <span class="text-xs text-(--text-muted) truncate font-mono opacity-60">{{ group.id }}</span>
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
             
-            <div v-else-if="filteredGroups.length === 0" class="flex flex-col items-center justify-center h-full text-(--text-muted) px-4 text-center">
-              <IconGhost class="w-8 h-8 mb-2 opacity-50" />
-              <span class="text-sm">{{ searchQuery ? 'No recipients found.' : 'No recipients tracked yet.' }}</span>
+            <div class="p-4 border-t border-(--border-color) bg-(--bg-layout)/50 shrink-0">
+               <button type="button" @click="toggleSelectAll" class="w-full py-2 text-sm font-semibold text-(--text-heading) hover:bg-(--bg-layout) border border-(--border-color) rounded-lg transition-colors">
+                  {{ allFilteredSelected ? 'Deselect All Shown' : 'Select All Shown' }}
+                </button>
             </div>
+          </div>
 
-            <div v-else class="space-y-1">
-              <label 
-                v-for="group in filteredGroups" 
-                :key="group.id"
-                class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-(--bg-layout) group/item"
-                :class="{'bg-primary-subtle/30': selectedGroups.includes(group.id)}"
+          <!-- Action Card -->
+          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
+             <button 
+                type="submit" 
+                :disabled="sending || !message.trim() || selectedGroups.length === 0 || (activeTab === 'schedule' && !scheduleTime)"
+                class="w-full py-3.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-hover focus:ring-4 focus:ring-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
               >
-                <div class="relative flex items-center justify-center">
-                  <input 
-                    type="checkbox" 
-                    :value="group.id" 
-                    v-model="selectedGroups"
-                    class="peer sr-only"
-                  />
-                  <div class="w-5 h-5 rounded border-2 border-(--border-color) peer-checked:bg-primary peer-checked:border-primary flex items-center justify-center transition-colors">
-                    <IconCheck class="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" stroke-width="3" />
-                  </div>
+                <IconSend v-if="!sending && activeTab === 'send'" class="w-5 h-5" />
+                <IconCalendarClock v-else-if="!sending && activeTab === 'schedule'" class="w-5 h-5" />
+                <IconLoader v-else class="w-5 h-5 animate-spin" />
+                {{ sending ? (activeTab === 'schedule' ? 'Scheduling...' : 'Broadcasting...') : (activeTab === 'schedule' ? 'Schedule Broadcast' : 'Send Broadcast') }}
+              </button>
+              <p class="text-[11px] text-center text-(--text-muted) mt-3 leading-relaxed">
+                <span v-if="activeTab === 'schedule'">
+                  Message will be queued to send to <b>{{ selectedGroups.length }}</b> recipients at the scheduled time.
+                </span>
+                <span v-else>
+                  Message will be immediately dispatched to <b>{{ selectedGroups.length }}</b> recipients. This action cannot be undone.
+                </span>
+              </p>
+          </div>
+
+        </div>
+      </form>
+    </div>
+
+    <!-- Scheduled Queue (Queue Tab) -->
+    <div v-if="activeTab === 'queue'" class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5 sm:p-6">
+      <div class="flex items-center justify-between mb-4 border-b border-(--border-color) pb-4">
+        <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
+          <IconCalendarClock class="w-5 h-5 text-primary" />
+          Scheduled Announcements Queue
+        </h2>
+        <button 
+          type="button" 
+          @click="fetchSchedules" 
+          class="p-1.5 hover:bg-(--bg-layout) border border-(--border-color) rounded-lg transition-colors text-(--text-muted) hover:text-(--text-heading)"
+          title="Refresh Queue"
+        >
+          <IconRefresh class="w-4 h-4" :class="{'animate-spin': loadingSchedules}" />
+        </button>
+      </div>
+
+      <!-- Schedules Loader / Empty state -->
+      <div v-if="loadingSchedules && schedules.length === 0" class="flex flex-col items-center justify-center py-12 text-(--text-muted)">
+        <IconLoader class="w-8 h-8 animate-spin mb-2" />
+        <span class="text-sm">Loading queue...</span>
+      </div>
+
+      <div v-else-if="schedules.length === 0" class="flex flex-col items-center justify-center py-12 text-(--text-muted) text-center">
+        <IconGhost class="w-10 h-10 mb-2 opacity-50 text-slate-400" />
+        <span class="text-sm font-medium">No scheduled messages in the queue.</span>
+        <p class="text-xs opacity-75 mt-1">Navigate to the "Schedule for Later" tab to compose one.</p>
+      </div>
+
+      <!-- Schedules List -->
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-(--border-color) text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+              <th class="py-3 px-4">Message</th>
+              <th class="py-3 px-4">Recipients</th>
+              <th class="py-3 px-4">Scheduled For</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-(--border-color) text-sm">
+            <tr v-for="schedule in sortedSchedules" :key="schedule.id" class="hover:bg-(--bg-layout)/50 transition-colors">
+              <td class="py-3.5 px-4 font-normal text-(--text-body) max-w-xs sm:max-w-md truncate">
+                <span class="font-medium text-(--text-heading)" :title="schedule.message">{{ truncateText(schedule.message, 60) }}</span>
+              </td>
+              <td class="py-3.5 px-4">
+                <div class="flex items-center gap-1.5">
+                  <span class="bg-primary-subtle text-primary text-xs font-semibold px-2 py-0.5 rounded-full">
+                    {{ schedule.chatIds.length }} recipient(s)
+                  </span>
                 </div>
-                
-                <div class="flex flex-col overflow-hidden flex-1">
-                  <span class="text-sm font-medium text-(--text-heading) truncate group-hover/item:text-primary transition-colors">{{ group.title }}</span>
-                  <div class="flex items-center gap-2 mt-0.5">
-                    <span class="text-[10px] font-bold tracking-widest uppercase" :class="group.type === 'Private Chat' ? 'text-blue-500' : 'text-emerald-500'">
-                      {{ group.type }}
-                    </span>
-                    <span class="text-xs text-(--text-muted) truncate font-mono opacity-60">{{ group.id }}</span>
-                  </div>
-                </div>
-              </label>
+              </td>
+              <td class="py-3.5 px-4 font-mono text-xs text-(--text-muted)">
+                {{ formatDateTime(schedule.sendAt) }}
+              </td>
+              <td class="py-3.5 px-4">
+                <span :class="getStatusBadgeClass(schedule.status)" class="text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                  {{ formatStatus(schedule.status) }}
+                </span>
+              </td>
+              <td class="py-3.5 px-4 text-right">
+                <button 
+                  v-if="schedule.status === 'pending'"
+                  type="button"
+                  @click="cancelSchedule(schedule.id)"
+                  :disabled="cancellingId === schedule.id"
+                  class="text-xs text-danger hover:text-red-700 bg-danger-subtle hover:bg-danger/25 px-2.5 py-1 rounded font-semibold disabled:opacity-50 transition-all inline-flex items-center gap-1"
+                >
+                  <IconTrash class="w-3.5 h-3.5" v-if="cancellingId !== schedule.id" />
+                  <IconLoader class="w-3.5 h-3.5 animate-spin" v-else />
+                  Cancel
+                </button>
+                <button 
+                  v-else
+                  type="button"
+                  @click="deleteScheduleHistory(schedule.id)"
+                  :disabled="cancellingId === schedule.id"
+                  class="text-xs text-(--text-muted) hover:text-danger hover:bg-danger-subtle px-2 py-1 rounded transition-all"
+                  title="Remove from history"
+                >
+                  <IconX class="w-4 h-4" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Custom Confirmation Modal -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="confirmModal.show" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) max-w-md w-full overflow-hidden p-6 space-y-4 transform scale-100 transition-all">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" :class="confirmModal.type === 'danger' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning'">
+              <IconAlertTriangle class="w-5 h-5" v-if="confirmModal.type === 'danger'" />
+              <IconAlertCircle class="w-5 h-5" v-else />
+            </div>
+            <div class="space-y-1 flex-1">
+              <h3 class="text-base font-semibold text-(--text-heading)">{{ confirmModal.title }}</h3>
+              <p class="text-sm text-(--text-muted) leading-relaxed">{{ confirmModal.message }}</p>
             </div>
           </div>
-          
-          <div class="p-4 border-t border-(--border-color) bg-(--bg-layout)/50 shrink-0">
-             <button type="button" @click="toggleSelectAll" class="w-full py-2 text-sm font-semibold text-(--text-heading) hover:bg-(--bg-layout) border border-(--border-color) rounded-lg transition-colors">
-                {{ allFilteredSelected ? 'Deselect All Shown' : 'Select All Shown' }}
-              </button>
+          <div class="flex justify-end gap-3 pt-2">
+            <button 
+              type="button" 
+              @click="closeConfirmModal(false)"
+              class="px-4 py-2 border border-(--border-color) hover:bg-(--bg-layout) rounded-lg text-sm font-semibold text-(--text-body) hover:text-(--text-heading) transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              @click="closeConfirmModal(true)"
+              class="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all cursor-pointer shadow-md hover:shadow-lg"
+              :class="confirmModal.type === 'danger' ? 'bg-danger hover:bg-danger/90' : 'bg-primary hover:bg-primary-hover'"
+            >
+              Confirm
+            </button>
           </div>
         </div>
-
-        <!-- Action Card -->
-        <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
-           <button 
-              type="submit" 
-              :disabled="sending || !message.trim() || selectedGroups.length === 0"
-              class="w-full py-3.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-hover focus:ring-4 focus:ring-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
-            >
-              <IconSend v-if="!sending" class="w-5 h-5" />
-              <IconLoader v-else class="w-5 h-5 animate-spin" />
-              {{ sending ? 'Broadcasting...' : 'Send Broadcast' }}
-            </button>
-            <p class="text-[11px] text-center text-(--text-muted) mt-3 leading-relaxed">
-              Message will be immediately dispatched to <b>{{ selectedGroups.length }}</b> recipients. This action cannot be undone.
-            </p>
-        </div>
-
       </div>
-    </form>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { 
   IconAlertCircle, 
   IconCheck, 
@@ -174,9 +508,20 @@ import {
   IconSend, 
   IconMessageDots, 
   IconUsers, 
-  IconTemplate, 
   IconSearch, 
-  IconGhost 
+  IconGhost,
+  IconCalendarClock,
+  IconRefresh,
+  IconTrash,
+  IconX,
+  IconList,
+  IconTool,
+  IconRocket,
+  IconInfoCircle,
+  IconAlertTriangle,
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronDown
 } from '@tabler/icons-vue'
 
 const message = ref('')
@@ -186,29 +531,260 @@ const error = ref('')
 const success = ref('')
 const sending = ref(false)
 
-const templates = [
+const announcementTemplates = [
   {
-    name: 'Announcement',
-    content: '📢 <b>Announcement</b>\n\nHello everyone,\n\n[Your message here]\n\nBest regards,\nAdmin Team'
+    name: 'Maintenance Notice',
+    icon: IconTool,
+    text: '<b>🔧 Scheduled Maintenance Notice</b>\n\nDear users,\n\nOur system will undergo scheduled maintenance on <b>[Date]</b> from <b>[Start Time]</b> to <b>[End Time]</b> (UTC).\n\nDuring this period, the bot/services may be temporarily unavailable. We apologize for any inconvenience.\n\nThank you for your understanding!'
   },
   {
-    name: 'Event Invite',
-    content: '🎉 <b>You are Invited!</b>\n\nJoin us for our upcoming event:\n📅 <b>Date:</b> [Date]\n⏰ <b>Time:</b> [Time]\n📍 <b>Location:</b> [Link or Place]\n\nWe hope to see you there!'
+    name: 'Feature Release',
+    icon: IconRocket,
+    text: '<b>🚀 New Feature Update!</b>\n\nWe are excited to announce a new update to our bot!\n\n<b>Key Changes:</b>\n- Feature 1: ...\n- Feature 2: ...\n- Bug fixes and stability improvements.\n\nTry it out now and share your feedback!'
   },
   {
-    name: 'Maintenance',
-    content: '⚠️ <b>Maintenance Notice</b>\n\nOur systems will be undergoing scheduled maintenance on [Date] at [Time].\nExpect minor disruptions.\n\nThank you for your patience!'
+    name: 'Security Alert',
+    icon: IconAlertTriangle,
+    text: '<b>⚠️ Security Warning</b>\n\nAttention all group members!\n\nPlease be cautious of scammers impersonating admins.\n\nRemember:\n- Admins will <b>never</b> message you first requesting personal details or payments.\n- Always double-check usernames before communicating.\n\nStay safe! 🛡️'
   },
   {
-    name: 'Rules Reminder',
-    content: '🛡️ <b>Community Rules Reminder</b>\n\nPlease remember to be respectful and follow our community guidelines. Spam or toxic behavior will be removed automatically.\n\nThank you for helping us keep the chat clean!'
+    name: 'General Notice',
+    icon: IconInfoCircle,
+    text: '<b>📢 Official Announcement</b>\n\nDear members,\n\n[Your announcement text here]\n\nBest regards,\nAdministration Team'
   }
 ]
+
+const confirmModal = ref({
+  show: false,
+  title: '',
+  message: '',
+  type: 'warning',
+  onConfirm: null
+})
+
+const showConfirmModal = (title, message, type = 'warning') => {
+  return new Promise((resolve) => {
+    confirmModal.value = {
+      show: true,
+      title,
+      message,
+      type,
+      onConfirm: (result) => {
+        confirmModal.value.show = false
+        resolve(result)
+      }
+    }
+  })
+}
+
+const closeConfirmModal = (result) => {
+  if (confirmModal.value.onConfirm) {
+    confirmModal.value.onConfirm(result)
+  }
+}
+
+const applyTemplate = async (text) => {
+  if (message.value.trim()) {
+    const confirmed = await showConfirmModal(
+      'Overwrite Message Draft?',
+      'Applying this template will overwrite your current draft message. Do you want to proceed?',
+      'warning'
+    )
+    if (!confirmed) return
+  }
+  message.value = text
+}
+
+const router = useRouter()
+const route = useRoute()
+
+const activeTab = computed(() => route.query.tab || 'send')
+const scheduleTime = ref('')
+const loadingSchedules = ref(false)
+const schedules = ref([])
+const cancellingId = ref('')
+
+// Custom DateTime Picker State
+const isDropdownOpen = ref(false)
+const pickerContainer = ref(null)
+const selectedDate = ref(null)
+const currentYear = ref(new Date().getFullYear())
+const currentMonth = ref(new Date().getMonth())
+const selectedHour = ref(12)
+const selectedMinute = ref(0)
+const selectedAmPm = ref('AM')
+
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+]
+
+const isSameDay = (d1, d2) => {
+  if (!d1 || !d2) return false
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate()
+}
+
+const daysInMonth = (year, month) => {
+  return new Date(year, month + 1, 0).getDate()
+}
+
+const startDayOfWeek = (year, month) => {
+  return new Date(year, month, 1).getDay()
+}
+
+const isPastDate = (date) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date < today
+}
+
+const calendarCells = computed(() => {
+  const cells = []
+  const startDay = startDayOfWeek(currentYear.value, currentMonth.value)
+  const totalDays = daysInMonth(currentYear.value, currentMonth.value)
+  
+  // Add empty spacer cells for days of previous month
+  for (let i = 0; i < startDay; i++) {
+    cells.push({ type: 'empty', label: '' })
+  }
+  
+  // Add current month days
+  for (let day = 1; day <= totalDays; day++) {
+    const dateObj = new Date(currentYear.value, currentMonth.value, day)
+    const isDisabled = isPastDate(dateObj)
+    cells.push({
+      type: 'day',
+      day,
+      date: dateObj,
+      disabled: isDisabled
+    })
+  }
+  return cells
+})
+
+const updateScheduleTime = () => {
+  if (!selectedDate.value) return
+  const hours24 = selectedAmPm.value === 'PM' 
+    ? (selectedHour.value === 12 ? 12 : selectedHour.value + 12) 
+    : (selectedHour.value === 12 ? 0 : selectedHour.value)
+    
+  const dateCopy = new Date(selectedDate.value)
+  dateCopy.setHours(hours24)
+  dateCopy.setMinutes(selectedMinute.value)
+  dateCopy.setSeconds(0)
+  dateCopy.setMilliseconds(0)
+  
+  scheduleTime.value = dateCopy.toISOString()
+}
+
+const initPickerValues = () => {
+  let date = new Date()
+  
+  // Set default to current time + 1 hour, rounded to 5 minutes
+  date.setHours(date.getHours() + 1)
+  const remainder = date.getMinutes() % 5
+  if (remainder !== 0) {
+    date.setMinutes(date.getMinutes() + (5 - remainder))
+  }
+  
+  selectedDate.value = date
+  currentYear.value = date.getFullYear()
+  currentMonth.value = date.getMonth()
+  
+  let hours = date.getHours()
+  selectedAmPm.value = hours >= 12 ? 'PM' : 'AM'
+  selectedHour.value = hours % 12
+  if (selectedHour.value === 0) selectedHour.value = 12
+  selectedMinute.value = date.getMinutes()
+  
+  updateScheduleTime()
+}
+
+const formattedScheduleTime = computed(() => {
+  if (!scheduleTime.value) return ''
+  const date = new Date(scheduleTime.value)
+  if (isNaN(date.getTime())) return ''
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+})
+
+const toggleDropdown = () => {
+  isDropdownOpen.value = !isDropdownOpen.value
+  if (isDropdownOpen.value && !selectedDate.value) {
+    initPickerValues()
+  }
+}
+
+const prevMonth = () => {
+  if (currentMonth.value === 0) {
+    currentMonth.value = 11
+    currentYear.value--
+  } else {
+    currentMonth.value--
+  }
+}
+
+const nextMonth = () => {
+  if (currentMonth.value === 11) {
+    currentMonth.value = 0
+    currentYear.value++
+  } else {
+    currentMonth.value++
+  }
+}
+
+const selectDay = (cell) => {
+  if (cell.disabled) return
+  selectedDate.value = cell.date
+  updateScheduleTime()
+}
+
+const handleClickOutside = (event) => {
+  if (pickerContainer.value && !pickerContainer.value.contains(event.target)) {
+    isDropdownOpen.value = false
+  }
+}
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'schedule' && !scheduleTime.value) {
+    initPickerValues()
+  }
+}, { immediate: true })
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 const { data, pending, refresh } = await useFetch('/api/groups')
 
 const groups = computed(() => {
   return data.value?.groups || []
+})
+
+const pendingSchedulesCount = computed(() => {
+  return schedules.value.filter(s => s.status === 'pending').length
+})
+
+const minDateTime = computed(() => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 })
 
 const filteredGroups = computed(() => {
@@ -239,28 +815,140 @@ const toggleSelectAll = () => {
   }
 }
 
+const fetchSchedules = async () => {
+  loadingSchedules.value = true
+  try {
+    const res = await $fetch('/api/schedule')
+    schedules.value = res.schedules || []
+  } catch (err) {
+    console.error('Failed to fetch schedules:', err)
+  } finally {
+    loadingSchedules.value = false
+  }
+}
+
+onMounted(() => {
+  fetchSchedules()
+})
+
+const sortedSchedules = computed(() => {
+  return [...schedules.value].sort((a, b) => new Date(a.sendAt) - new Date(b.sendAt))
+})
+
+const truncateText = (text, limit) => {
+  if (!text) return ''
+  if (text.length <= limit) return text
+  return text.substring(0, limit) + '...'
+}
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  return date.toLocaleString()
+}
+
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case 'pending': return 'badge-soft-warning'
+    case 'sending': return 'badge-soft-primary animate-pulse'
+    case 'sent': return 'badge-soft-success'
+    case 'failed': return 'badge-soft-danger'
+    case 'partially_failed': return 'badge-soft-danger'
+    default: return 'badge-soft-secondary'
+  }
+}
+
+const formatStatus = (status) => {
+  if (!status) return ''
+  return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')
+}
+
+const cancelSchedule = async (id) => {
+  const confirmed = await showConfirmModal(
+    'Cancel Announcement',
+    'Are you sure you want to cancel and remove this scheduled announcement? This action cannot be undone.',
+    'danger'
+  )
+  if (!confirmed) return
+  
+  cancellingId.value = id
+  try {
+    const res = await $fetch('/api/schedule', {
+      method: 'DELETE',
+      body: { id }
+    })
+    if (res.success) {
+      success.value = 'Scheduled announcement successfully cancelled.'
+      await fetchSchedules()
+    }
+  } catch (err) {
+    error.value = err.data?.statusMessage || err.message || 'Failed to cancel schedule.'
+  } finally {
+    cancellingId.value = ''
+  }
+}
+
+const deleteScheduleHistory = async (id) => {
+  cancellingId.value = id
+  try {
+    const res = await $fetch('/api/schedule', {
+      method: 'DELETE',
+      body: { id }
+    })
+    if (res.success) {
+      await fetchSchedules()
+    }
+  } catch (err) {
+    error.value = err.data?.statusMessage || err.message || 'Failed to remove schedule history.'
+  } finally {
+    cancellingId.value = ''
+  }
+}
+
 const sendAnnouncement = async () => {
   if (!message.value.trim() || selectedGroups.value.length === 0) return
+  if (activeTab.value === 'schedule' && !scheduleTime.value) return
   
   error.value = ''
   success.value = ''
   sending.value = true
   
   try {
-    const res = await $fetch('/api/announce', {
-      method: 'POST',
-      body: {
-        message: message.value,
-        chatIds: selectedGroups.value
+    if (activeTab.value === 'schedule') {
+      const utcString = new Date(scheduleTime.value).toISOString()
+      
+      const res = await $fetch('/api/schedule', {
+        method: 'POST',
+        body: {
+          message: message.value,
+          chatIds: selectedGroups.value,
+          sendAt: utcString
+        }
+      })
+      if (res.success) {
+        message.value = ''
+        selectedGroups.value = []
+        scheduleTime.value = ''
+        success.value = 'Announcement successfully scheduled.'
+        router.push({ query: { tab: 'queue' } })
+        await fetchSchedules()
       }
-    })
-    
-    if (res.success) {
-      message.value = ''
-      selectedGroups.value = []
-      success.value = `Successfully broadcasted to ${res.sent} recipient(s).`
-      if (res.failed > 0) {
-        success.value += ` Failed to send to ${res.failed} recipient(s).`
+    } else {
+      const res = await $fetch('/api/announce', {
+        method: 'POST',
+        body: {
+          message: message.value,
+          chatIds: selectedGroups.value
+        }
+      })
+      
+      if (res.success) {
+        message.value = ''
+        selectedGroups.value = []
+        success.value = `Successfully broadcasted to ${res.sent} recipient(s).`
+        if (res.failed > 0) {
+          success.value += ` Failed to send to ${res.failed} recipient(s).`
+        }
       }
     }
   } catch (err) {

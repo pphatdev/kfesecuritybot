@@ -1,6 +1,6 @@
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   try {
-    const session = verifySession(event)
+    const session = await verifySession(event)
     return {
       authenticated: true,
       user: {

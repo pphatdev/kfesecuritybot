@@ -1,42 +1,31 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { settings } from '../database/schema'
+import { eq } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   
   if (typeof body.group_delays !== 'object') {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Invalid group_delays payload'
-    })
-  }
-
-  const settingsPath = path.resolve(process.cwd(), '../data/settings.json')
-  let currentSettings: any = { group_delays: {} }
-
-  if (fs.existsSync(settingsPath)) {
-    try {
-      currentSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
-      if (!currentSettings.group_delays) currentSettings.group_delays = {}
-    } catch (e) {
-      console.error('Error reading settings.json', e)
-    }
-  }
-
-  // Parse and validate the new delays
-  for (const [chatId, delay] of Object.entries(body.group_delays)) {
-    currentSettings.group_delays[chatId] = Math.max(0, parseInt(delay as string) || 0)
+    throw createError({ statusCode: 400, statusMessage: 'Invalid group_delays payload' })
   }
 
   try {
-    fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
-    fs.writeFileSync(settingsPath, JSON.stringify(currentSettings, null, 2), 'utf-8')
-    return { success: true, settings: currentSettings }
+    const currentSetting = await db.select().from(settings).where(eq(settings.key, 'group_delays'))
+    let group_delays: Record<string, number> = currentSetting.length > 0 ? currentSetting[0].value as Record<string, number> : {}
+
+    for (const [chatId, delay] of Object.entries(body.group_delays)) {
+      group_delays[chatId] = Math.max(0, parseInt(delay as string) || 0)
+    }
+
+    if (currentSetting.length > 0) {
+      await db.update(settings).set({ value: group_delays }).where(eq(settings.key, 'group_delays'))
+    } else {
+      await db.insert(settings).values({ key: 'group_delays', value: group_delays })
+    }
+
+    return { success: true, settings: { group_delays } }
   } catch (error) {
-    console.error('Error saving settings.json:', error)
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Failed to save settings'
-    })
+    console.error('Error saving settings to DB:', error)
+    throw createError({ statusCode: 500, statusMessage: 'Failed to save settings' })
   }
 })

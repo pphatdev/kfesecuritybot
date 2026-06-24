@@ -24,7 +24,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         status = result.new_chat_member.status
         if status in ['member', 'administrator']:
             logger.info(f"Bot added to group: {chat.title} ({chat.id})")
-            track_group(chat.id, chat.title)
+            await track_group(chat.id, chat.title)
         elif status in ['left', 'kicked']:
             logger.info(f"Bot removed from group: {chat.title} ({chat.id})")
             # Optionally, you could untrack the group, but keeping it is fine.
@@ -80,14 +80,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- 3. Track User & Group ---
     if message.from_user:
-        track_user(message.from_user.id, message.from_user.username)
+        await track_user(message.from_user.id, message.from_user.username)
+
+    if message.chat and message.chat.type == "private":
+        from app.services.private_chats_db import log_private_chat
+        await log_private_chat(
+            user_id=message.from_user.id if message.from_user else message.chat.id,
+            username=message.from_user.username or message.from_user.first_name if message.from_user else "Unknown",
+            message=text
+        )
         
     if message.chat and message.chat.type != "private":
-        track_group(message.chat.id, message.chat.title)
+        await track_group(message.chat.id, message.chat.title)
         
         # --- 4. Enforce Slow Mode ---
         if message.from_user:
-            delay = get_group_delay(message.chat.id)
+            delay = await get_group_delay(message.chat.id)
             if delay > 0:
                 chat_id = message.chat.id
                 user_id = message.from_user.id
@@ -106,7 +114,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_last_message[(chat_id, user_id)] = now
 
     # --- 5. Increment Stats & Log ---
-    increment_scanned()
+    await increment_scanned()
 
     if message.from_user:
         username = message.from_user.username or message.from_user.first_name
@@ -135,7 +143,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- Step 1: Keyword pre-check against built-in + custom admin list ---
-    pre_result = pre_check(text, sticker=message.sticker)
+    pre_result = await pre_check(text, sticker=message.sticker)
 
     if pre_result:
         match_type, custom_reason = pre_result if isinstance(pre_result, tuple) else (pre_result, None)
@@ -196,9 +204,9 @@ async def _delete_and_notify(message, reason: str, source: str, category: str = 
         user_mention = "<b>Unknown</b>"
     
     # Log to real-time dashboard (this also increments the strikes in JSON)
-    log_violation(user_id, user_name, reason, category, message.text or "Sticker/Media")
+    await log_violation(user_id, user_name, reason, category, message.text or "Sticker/Media")
     
-    current_strikes = get_user_strikes(user_id)
+    current_strikes = await get_user_strikes(user_id)
     
     await message.chat.send_action(action="typing")
 

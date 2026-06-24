@@ -1,10 +1,11 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { allowedUsers } from '../database/schema'
+import { eq, and } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const target = body?.target
-  const type = body?.type // 'username' or 'user_id'
+  let type = body?.type // 'username' or 'user_id'
 
   if (!target || !type) {
     throw createError({
@@ -13,35 +14,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const allowedUsersPath = path.resolve(process.cwd(), '../data/allowed_users.json')
-  
-  if (!fs.existsSync(allowedUsersPath)) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'No custom admins found'
-    })
-  }
+  if (type === 'user_id') type = 'id' // map to db schema enum type
 
   try {
-    const data = JSON.parse(fs.readFileSync(allowedUsersPath, 'utf-8'))
-    let modified = false
+    const result = await db.delete(allowedUsers).where(
+      and(
+        eq(allowedUsers.type, type),
+        eq(allowedUsers.value, target)
+      )
+    )
 
-    if (type === 'username' && data.usernames) {
-      const idx = data.usernames.indexOf(target)
-      if (idx !== -1) {
-        data.usernames.splice(idx, 1)
-        modified = true
-      }
-    } else if (type === 'user_id' && data.user_ids) {
-      const idx = data.user_ids.indexOf(target)
-      if (idx !== -1) {
-        data.user_ids.splice(idx, 1)
-        modified = true
-      }
-    }
-
-    if (modified) {
-      fs.writeFileSync(allowedUsersPath, JSON.stringify(data, null, 2), 'utf-8')
+    if (result.changes > 0) {
       return { success: true }
     } else {
       throw createError({

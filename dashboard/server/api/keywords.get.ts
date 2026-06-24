@@ -1,38 +1,29 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { keywords } from '../database/schema'
 
-export default defineEventHandler((event) => {
-  verifySession(event)
+export default defineEventHandler(async (event) => {
+  await verifySession(event)
   try {
-    // Path to the python bot's keywords json file
-    const filePath = path.resolve(process.cwd(), '../data/custom_keywords.json')
+    const allKeywords = await db.select().from(keywords)
     
-    if (!fs.existsSync(filePath)) {
-      return { 
-        spam: [], 
-        toxic: [], 
-        pattern: [],
-        debug_error: "File not found", 
-        debug_path: filePath 
-      }
+    const parsedData: Record<string, any[]> = {
+      spam: [],
+      toxic: [],
+      pattern: [],
+      sticker: []
     }
     
-    const fileData = fs.readFileSync(filePath, 'utf-8')
-    const parsedData = JSON.parse(fileData)
-    
-    // Normalize pattern array to objects for the UI
-    if (parsedData.pattern && Array.isArray(parsedData.pattern)) {
-      parsedData.pattern = parsedData.pattern.map((p: any) => {
-        if (typeof p === 'string') {
-          return { word: p, response: '' }
-        }
-        return p
-      })
+    for (const kw of allKeywords) {
+      if (kw.category === 'pattern') {
+        parsedData.pattern.push({ id: kw.id, word: kw.word, response: kw.response || '' })
+      } else if (parsedData[kw.category]) {
+        parsedData[kw.category].push(kw.word)
+      }
     }
     
     return parsedData
   } catch (error) {
-    console.error('Error reading keywords:', error)
+    console.error('Error reading keywords from DB:', error)
     throw createError({
       statusCode: 500,
       statusMessage: 'Failed to read keywords'

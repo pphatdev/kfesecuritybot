@@ -1,4 +1,5 @@
 export default defineEventHandler(async (event) => {
+  await verifySession(event)
   try {
     let message = ''
     let chatIds: string[] = []

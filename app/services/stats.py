@@ -1,102 +1,71 @@
-import json
-import os
 import logging
 from datetime import datetime
+from app.services.db import get_db
 
 logger = logging.getLogger(__name__)
 
-STATS_FILE = os.path.join(os.path.dirname(__file__), '../../data/dashboard_stats.json')
-
-# Default empty state
-DEFAULT_STATS = {
-    "total_messages_scanned": 0,
-    "spam_toxic_blocked": 0,
-    "recent_activity": [],
-    "violations": {}
-}
-
-def load_stats() -> dict:
-    if not os.path.exists(STATS_FILE):
-        return DEFAULT_STATS.copy()
+async def increment_scanned():
     try:
-        with open(STATS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        async with await get_db() as db:
+            await db.execute('''
+                INSERT INTO stats (id, total_messages_scanned, spam_toxic_blocked)
+                VALUES (1, 1, 0)
+                ON CONFLICT(id) DO UPDATE SET
+                    total_messages_scanned = total_messages_scanned + 1
+            ''')
+            await db.commit()
     except Exception as e:
-        logger.error(f"Error reading stats file: {e}")
-        return DEFAULT_STATS.copy()
+        logger.error(f"Error incrementing scanned: {e}")
 
-def save_stats(data: dict):
-    os.makedirs(os.path.dirname(STATS_FILE), exist_ok=True)
+async def log_violation(user_id: int, username: str, reason: str, category: str, text: str):
     try:
-        with open(STATS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        async with await get_db() as db:
+            await db.execute('''
+                INSERT INTO stats (id, total_messages_scanned, spam_toxic_blocked)
+                VALUES (1, 0, 1)
+                ON CONFLICT(id) DO UPDATE SET
+                    spam_toxic_blocked = spam_toxic_blocked + 1
+            ''')
+            
+            now_str = datetime.now().strftime("%I:%M %p")
+            await db.execute('''
+                INSERT INTO activity_logs (time, type, text, username)
+                VALUES (?, ?, ?, ?)
+            ''', (now_str, category, f"Deleted message from <b>@{username}</b> (Reason: {reason})", username))
+            
+            str_user_id = str(user_id)
+            last_violation = f"Today, {now_str} ({category.capitalize()})"
+            await db.execute('''
+                INSERT INTO user_violations (user_id, username, strikes, last_violation)
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = excluded.username,
+                    strikes = strikes + 1,
+                    last_violation = excluded.last_violation
+            ''', (str_user_id, username, last_violation))
+            
+            await db.commit()
     except Exception as e:
-        logger.error(f"Error saving stats file: {e}")
+        logger.error(f"Error logging violation: {e}")
 
-def increment_scanned():
-    data = load_stats()
-    data['total_messages_scanned'] = data.get('total_messages_scanned', 0) + 1
-    save_stats(data)
+async def log_system_action(text: str):
+    try:
+        async with await get_db() as db:
+            now_str = datetime.now().strftime("%I:%M %p")
+            await db.execute('''
+                INSERT INTO activity_logs (time, type, text, username)
+                VALUES (?, ?, ?, ?)
+            ''', (now_str, "action", text, "System"))
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Error logging system action: {e}")
 
-def log_violation(user_id: int, username: str, reason: str, category: str, text: str):
-    data = load_stats()
-    
-    # Update global counts
-    data['spam_toxic_blocked'] = data.get('spam_toxic_blocked', 0) + 1
-    
-    # Get current time
-    now_str = datetime.now().strftime("%I:%M %p")
-    
-    # Update recent activity (keep last 50)
-    activity = {
-        "time": now_str,
-        "type": category, # "toxic" or "spam" or "action"
-        "text": f"Deleted message from <b>@{username}</b> (Reason: {reason})",
-        "username": username
-    }
-    activities = data.get('recent_activity', [])
-    activities.insert(0, activity)
-    data['recent_activity'] = activities[:50]
-    
-    # Update user violations
-    violations = data.get('violations', {})
-    str_user_id = str(user_id)
-    
-    user_data = violations.get(str_user_id, {
-        "username": username,
-        "strikes": 0,
-        "last_violation": ""
-    })
-    
-    user_data["strikes"] += 1
-    user_data["last_violation"] = f"Today, {now_str} ({category.capitalize()})"
-    # Keep the username fresh
-    user_data["username"] = username
-    
-    violations[str_user_id] = user_data
-    data['violations'] = violations
-    
-    save_stats(data)
-
-def log_system_action(text: str):
-    data = load_stats()
-    now_str = datetime.now().strftime("%I:%M %p")
-    
-    activity = {
-        "time": now_str,
-        "type": "action",
-        "text": text,
-        "username": "System"
-    }
-    
-    activities = data.get('recent_activity', [])
-    activities.insert(0, activity)
-    data['recent_activity'] = activities[:50]
-    
-    save_stats(data)
-
-def get_user_strikes(user_id: int) -> int:
-    data = load_stats()
-    violations = data.get('violations', {})
-    user_data = violations.get(str(user_id), {})
-    return user_data.get("strikes", 0)
+async def get_user_strikes(user_id: int) -> int:
+    try:
+        async with await get_db() as db:
+            async with db.execute('SELECT strikes FROM user_violations WHERE user_id = ?', (str(user_id),)) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else 0
+    except Exception as e:
+        logger.error(f"Error getting user strikes: {e}")
+        return 0

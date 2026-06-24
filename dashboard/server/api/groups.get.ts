@@ -1,39 +1,19 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { groups, users } from '../database/schema'
 
 export default defineEventHandler(async (event) => {
-  const groupsDbPath = path.resolve(process.cwd(), '../data/groups.json')
-  let groupsData: Record<string, any> = {}
+  const groupsData = await db.select().from(groups)
+  const usersData = await db.select().from(users)
 
-  if (fs.existsSync(groupsDbPath)) {
-    try {
-      groupsData = JSON.parse(fs.readFileSync(groupsDbPath, 'utf-8'))
-    } catch (e) {
-      console.error('Error reading groups.json', e)
-    }
-  }
-
-  const usersDbPath = path.resolve(process.cwd(), '../data/users.json')
-  let usersData: Record<string, any> = {}
-
-  if (fs.existsSync(usersDbPath)) {
-    try {
-      usersData = JSON.parse(fs.readFileSync(usersDbPath, 'utf-8'))
-    } catch (e) {
-      console.error('Error reading users.json', e)
-    }
-  }
-
-  // Convert the object mapping into an array
-  const groupsList = Object.entries(groupsData).map(([id, data]) => ({
-    id,
-    title: data.title || `Group ${id}`,
+  const groupsList = groupsData.map((data) => ({
+    id: data.id,
+    title: data.title || `Group ${data.id}`,
     type: 'Group/Channel'
   }))
 
-  const usersList = Object.entries(usersData).map(([id, data]) => ({
-    id,
-    title: data.username ? `@${data.username}` : `User ${id}`,
+  const usersList = usersData.map((data) => ({
+    id: data.id,
+    title: data.username ? `@${data.username}` : `User ${data.id}`,
     type: 'Private Chat'
   }))
 

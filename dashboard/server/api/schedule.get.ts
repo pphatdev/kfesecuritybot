@@ -1,21 +1,13 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { scheduledMessages } from '../database/schema'
 
-export default defineEventHandler((event) => {
-  verifySession(event)
+export default defineEventHandler(async (event) => {
+  await verifySession(event)
   try {
-    const filePath = path.resolve(process.cwd(), '../data/scheduled_messages.json')
-    
-    if (!fs.existsSync(filePath)) {
-      return { schedules: [] }
-    }
-    
-    const fileData = fs.readFileSync(filePath, 'utf-8')
-    const parsedData = JSON.parse(fileData)
-    
-    return { schedules: parsedData }
+    const schedules = await db.select().from(scheduledMessages)
+    return { schedules }
   } catch (error) {
-    console.error('Error reading schedules:', error)
+    console.error('Error reading schedules from DB:', error)
     throw createError({
       statusCode: 500,
       statusMessage: 'Failed to read schedules'

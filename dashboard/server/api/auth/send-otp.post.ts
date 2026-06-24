@@ -1,7 +1,6 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
-const OTP_FILE = path.resolve(process.cwd(), '../data/otps.json')
+import { db } from '../../database'
+import { users, otps, allowedUsers } from '../../database/schema'
+import { eq } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -9,38 +8,27 @@ export default defineEventHandler(async (event) => {
     const { username_or_id } = body
 
     if (!username_or_id) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Username or ID is required'
-      })
+      throw createError({ statusCode: 400, statusMessage: 'Username or ID is required' })
     }
 
     const val = username_or_id.toString().trim()
     const lowerVal = val.toLowerCase().replace(/^@/, '')
 
-    // Resolve username <-> user_id
-    const usersDbPath = path.resolve(process.cwd(), '../data/users.json')
     let resolvedUsername = lowerVal
     let resolvedUserId = lowerVal
     const isNumericInput = /^\d+$/.test(lowerVal)
 
-    if (fs.existsSync(usersDbPath)) {
-      try {
-        const usersData = JSON.parse(fs.readFileSync(usersDbPath, 'utf-8'))
-        if (isNumericInput) {
-          if (usersData[lowerVal] && usersData[lowerVal].username) {
-            resolvedUsername = usersData[lowerVal].username
-          }
-        } else {
-          for (const [uid, udata] of Object.entries(usersData)) {
-            if ((udata as any).username === lowerVal) {
-              resolvedUserId = uid
-              break
-            }
-          }
-        }
-      } catch(e) {
-         console.error('Error reading users.json', e)
+    if (isNumericInput) {
+      const userRes = await db.select().from(users).where(eq(users.id, lowerVal))
+      const firstUser = userRes[0]
+      if (firstUser && firstUser.username) {
+        resolvedUsername = firstUser.username.toLowerCase()
+      }
+    } else {
+      const userRes = await db.select().from(users)
+      const foundUser = userRes.find(u => u.username?.toLowerCase() === lowerVal)
+      if (foundUser) {
+        resolvedUserId = foundUser.id
       }
     }
 
@@ -53,27 +41,12 @@ export default defineEventHandler(async (event) => {
 
     // 1. Authorization Check
     const env = getParentEnv()
-    const adminUsernames = (env.DASHBOARD_ADMINS || '')
-      .split(',')
-      .map((u) => u.trim().toLowerCase())
-      .filter(Boolean)
-    const adminIds = (env.DASHBOARD_ADMIN_IDS || '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean)
+    const adminUsernames = (env.DASHBOARD_ADMINS || '').split(',').map((u: string) => u.trim().toLowerCase()).filter(Boolean)
+    const adminIds = (env.DASHBOARD_ADMIN_IDS || '').split(',').map((id: string) => id.trim()).filter(Boolean)
 
-    const allowedUsersPath = path.resolve(process.cwd(), '../data/allowed_users.json')
-    let allowedUsernamesJson: string[] = []
-    let allowedIdsJson: string[] = []
-    if (fs.existsSync(allowedUsersPath)) {
-      try {
-        const allowedData = JSON.parse(fs.readFileSync(allowedUsersPath, 'utf-8'))
-        allowedUsernamesJson = (allowedData.usernames || []).map((u: string) => u.trim().toLowerCase())
-        allowedIdsJson = (allowedData.user_ids || []).map((id: any) => id.toString().trim())
-      } catch (e) {
-        console.error('Error reading allowed_users.json', e)
-      }
-    }
+    const dbAllowed = await db.select().from(allowedUsers)
+    const allowedUsernamesJson = dbAllowed.filter(u => u.type === 'username').map(u => u.value.toLowerCase())
+    const allowedIdsJson = dbAllowed.filter(u => u.type === 'id').map(u => u.value)
 
     let isAuthorized = false
     const noListsDefined = adminUsernames.length === 0 && adminIds.length === 0 && allowedUsernamesJson.length === 0 && allowedIdsJson.length === 0
@@ -90,42 +63,24 @@ export default defineEventHandler(async (event) => {
     }
 
     if (!isAuthorized) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'You are not authorized to access this dashboard.'
-      })
+      throw createError({ statusCode: 403, statusMessage: 'You are not authorized to access this dashboard.' })
     }
 
     // 2. Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
-    const expiresAt = Math.floor(Date.now() / 1000) + 300 // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
 
-    let otps: any = {}
-    if (fs.existsSync(OTP_FILE)) {
-      try {
-        otps = JSON.parse(fs.readFileSync(OTP_FILE, 'utf-8'))
-      } catch (e) {
-        // Ignore JSON parse errors, will overwrite
-      }
+    const existingOtp = await db.select().from(otps).where(eq(otps.userId, resolvedUserId))
+    if (existingOtp.length > 0) {
+      await db.update(otps).set({ otp, expiresAt, username: resolvedUsername }).where(eq(otps.userId, resolvedUserId))
+    } else {
+      await db.insert(otps).values({ userId: resolvedUserId, username: resolvedUsername, otp, expiresAt })
     }
-
-    // Save OTP using the resolved user ID
-    otps[resolvedUserId] = {
-      otp: otp,
-      username: resolvedUsername,
-      expires_at: expiresAt
-    }
-
-    fs.mkdirSync(path.dirname(OTP_FILE), { recursive: true })
-    fs.writeFileSync(OTP_FILE, JSON.stringify(otps, null, 2), 'utf-8')
 
     // 3. Send OTP via Telegram HTTP API
     const botToken = env.TELEGRAM_BOT_TOKEN
     if (!botToken || botToken === 'your_telegram_bot_token_here') {
-      throw createError({
-        statusCode: 500,
-        statusMessage: 'Bot token not configured on server.'
-      })
+      throw createError({ statusCode: 500, statusMessage: 'Bot token not configured on server.' })
     }
 
     const text = `🔐 *BotControl Dashboard Login*\n\nYour One-Time Password (OTP) is: \`${otp}\`\nIt is valid for 5 minutes.\n\nEnter this OTP on the dashboard login page.`
@@ -146,15 +101,16 @@ export default defineEventHandler(async (event) => {
       console.error('Telegram API Error:', tgResult)
       throw createError({
         statusCode: 400,
-        statusMessage: `Failed to send OTP via Telegram. Please ensure you have started a private chat with the bot first. Error: ${tgResult.description || 'Unknown error'}`
+        statusMessage: `Failed to send OTP via Telegram. Error: ${tgResult.description || 'Unknown error'}`
       })
     }
 
     return { success: true }
   } catch (error: any) {
+    if (error.statusCode) throw error
     throw createError({
-      statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Internal Server Error'
+      statusCode: 500,
+      statusMessage: 'Internal Server Error'
     })
   }
 })

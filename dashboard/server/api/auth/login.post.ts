@@ -1,8 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../../database'
+import { sessions, otps, users, allowedUsers } from '../../database/schema'
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-
-const OTP_FILE = path.resolve(process.cwd(), '../data/otps.json')
 
 export default defineEventHandler(async (event) => {
   try {
@@ -10,85 +9,49 @@ export default defineEventHandler(async (event) => {
     const { username_or_id, otp } = body
 
     if (!username_or_id || !otp) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Username/ID and OTP are required'
-      })
+      throw createError({ statusCode: 400, statusMessage: 'Username/ID and OTP are required' })
     }
 
-    if (!fs.existsSync(OTP_FILE)) {
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'Invalid username/ID or OTP'
-      })
-    }
-
-    const otpsData = fs.readFileSync(OTP_FILE, 'utf-8')
-    const otps = JSON.parse(otpsData)
-
-    let matchedUserId: string | null = null
     const searchVal = username_or_id.toString().trim().toLowerCase().replace(/^@/, '')
 
-    for (const [userId, item] of Object.entries(otps)) {
-      const otpItem = item as any
-      const isIdMatch = userId === searchVal
-      const isUsernameMatch = otpItem.username && otpItem.username.toLowerCase() === searchVal
+    const otpRes = await db.select().from(otps)
+    let matchedUserId: string | null = null
+    let otpDetails: any = null
+
+    for (const item of otpRes) {
+      const isIdMatch = item.userId === searchVal
+      const isUsernameMatch = item.username && item.username.toLowerCase() === searchVal
 
       if (isIdMatch || isUsernameMatch) {
-        if (otpItem.otp.toString().trim() === otp.toString().trim()) {
-          matchedUserId = userId
+        if (item.otp.toString().trim() === otp.toString().trim()) {
+          matchedUserId = item.userId
+          otpDetails = item
           break
         }
       }
     }
 
-    if (!matchedUserId) {
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'Invalid username/ID or OTP'
-      })
+    if (!matchedUserId || !otpDetails) {
+      throw createError({ statusCode: 401, statusMessage: 'Invalid username/ID or OTP' })
     }
 
-    const otpDetails = otps[matchedUserId]
-    const currentTime = Math.floor(Date.now() / 1000)
+    const currentTime = new Date()
 
-    if (otpDetails.expires_at < currentTime) {
-      // Clean up expired OTP
-      delete otps[matchedUserId]
-      fs.writeFileSync(OTP_FILE, JSON.stringify(otps, null, 2), 'utf-8')
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'OTP has expired. Please request a new one.'
-      })
+    if (otpDetails.expiresAt < currentTime) {
+      await db.delete(otps).where(eq(otps.userId, matchedUserId))
+      throw createError({ statusCode: 401, statusMessage: 'OTP has expired. Please request a new one.' })
     }
 
     // Check against authorized admin lists in parent .env
     const env = getParentEnv()
-    const adminUsernames = (env.DASHBOARD_ADMINS || '')
-      .split(',')
-      .map((u) => u.trim().toLowerCase())
-      .filter(Boolean)
-    const adminIds = (env.DASHBOARD_ADMIN_IDS || '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean)
+    const adminUsernames = (env.DASHBOARD_ADMINS || '').split(',').map((u: string) => u.trim().toLowerCase()).filter(Boolean)
+    const adminIds = (env.DASHBOARD_ADMIN_IDS || '').split(',').map((id: string) => id.trim()).filter(Boolean)
 
-    // Check against data/allowed_users.json
-    const allowedUsersPath = path.resolve(process.cwd(), '../data/allowed_users.json')
-    let allowedUsernamesJson: string[] = []
-    let allowedIdsJson: string[] = []
-    if (fs.existsSync(allowedUsersPath)) {
-      try {
-        const allowedData = JSON.parse(fs.readFileSync(allowedUsersPath, 'utf-8'))
-        allowedUsernamesJson = (allowedData.usernames || []).map((u: string) => u.trim().toLowerCase())
-        allowedIdsJson = (allowedData.user_ids || []).map((id: any) => id.toString().trim())
-      } catch (e) {
-        console.error('Error reading allowed_users.json', e)
-      }
-    }
+    const dbAllowed = await db.select().from(allowedUsers)
+    const allowedUsernamesJson = dbAllowed.filter(u => u.type === 'username').map(u => u.value.toLowerCase())
+    const allowedIdsJson = dbAllowed.filter(u => u.type === 'id').map(u => u.value)
 
     let isAuthorized = false
-    // If no lists are defined at all, we fall back to letting anyone who got an OTP in (since bot restricts who can get an OTP).
     if (adminUsernames.length === 0 && adminIds.length === 0 && allowedUsernamesJson.length === 0 && allowedIdsJson.length === 0) {
       isAuthorized = true
     } else {
@@ -104,27 +67,22 @@ export default defineEventHandler(async (event) => {
     }
 
     if (!isAuthorized) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'You are not authorized to access this dashboard.'
-      })
+      throw createError({ statusCode: 403, statusMessage: 'You are not authorized to access this dashboard.' })
     }
 
     // OTP is valid and user is authorized! Clean up OTP
-    delete otps[matchedUserId]
-    fs.writeFileSync(OTP_FILE, JSON.stringify(otps, null, 2), 'utf-8')
+    await db.delete(otps).where(eq(otps.userId, matchedUserId))
 
     // Create session
     const sessionToken = randomUUID()
-    const sessions = loadSessions()
-    const sessionExpiresAt = currentTime + (24 * 60 * 60) // 24 hours
+    const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
-    sessions[sessionToken] = {
-      user_id: parseInt(matchedUserId),
+    await db.insert(sessions).values({
+      token: sessionToken,
+      userId: matchedUserId,
       username: otpDetails.username,
-      expires_at: sessionExpiresAt
-    }
-    saveSessions(sessions)
+      expiresAt: sessionExpiresAt
+    })
 
     // Set cookie
     setCookie(event, 'session_token', sessionToken, {
@@ -142,9 +100,10 @@ export default defineEventHandler(async (event) => {
       }
     }
   } catch (error: any) {
+    if (error.statusCode) throw error
     throw createError({
-      statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Internal Server Error'
+      statusCode: 500,
+      statusMessage: 'Internal Server Error'
     })
   }
 })

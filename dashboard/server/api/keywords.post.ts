@@ -1,8 +1,9 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { keywords } from '../database/schema'
+import { eq, and } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
-  verifySession(event)
+  await verifySession(event)
   try {
     const body = await readBody(event)
     const { word, category, response } = body
@@ -11,46 +12,23 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Word and category are required' })
     }
 
-    const filePath = path.resolve(process.cwd(), '../data/custom_keywords.json')
-    if (!fs.existsSync(filePath)) {
-      throw createError({ statusCode: 404, statusMessage: 'Keywords file not found' })
+    const trimmedWord = category === 'pattern' || category === 'sticker' ? word.trim() : word.trim().toLowerCase()
+    
+    const existing = await db.select().from(keywords).where(
+      and(eq(keywords.word, trimmedWord), eq(keywords.category, category))
+    )
+    
+    if (existing.length > 0) {
+      throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
     }
     
-    const fileData = fs.readFileSync(filePath, 'utf-8')
-    const data = JSON.parse(fileData)
-    if (!data.pattern) data.pattern = []
-    if (!data.sticker) data.sticker = []
+    await db.insert(keywords).values({
+      word: trimmedWord,
+      category,
+      response: category === 'pattern' ? response || '' : null
+    })
     
-    if (data[category]) {
-      if (category === 'pattern') {
-        const lowerWord = word.trim()
-        const exists = data.pattern.some((p: any) => (typeof p === 'string' ? p : p.word) === lowerWord)
-        if (exists) {
-          throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
-        }
-        data.pattern.push({ word: lowerWord, response: response || '' })
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-        return { success: true, message: `Added '${lowerWord}' to ${category}` }
-      } else if (category === 'sticker') {
-        const trimmedWord = word.trim()
-        if (data[category].includes(trimmedWord)) {
-          throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
-        }
-        data[category].push(trimmedWord)
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-        return { success: true, message: `Added '${trimmedWord}' to ${category}` }
-      } else {
-        const lowerWord = word.trim().toLowerCase()
-        if (data[category].includes(lowerWord)) {
-          throw createError({ statusCode: 400, statusMessage: 'Keyword already exists' })
-        }
-        data[category].push(lowerWord)
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-        return { success: true, message: `Added '${lowerWord}' to ${category}` }
-      }
-    } else {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid category' })
-    }
+    return { success: true, message: `Added '${trimmedWord}' to ${category}` }
   } catch (error: any) {
     throw createError({
       statusCode: error.statusCode || 500,

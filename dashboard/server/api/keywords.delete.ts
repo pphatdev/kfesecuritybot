@@ -1,8 +1,9 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { keywords } from '../database/schema'
+import { eq, and } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
-  verifySession(event)
+  await verifySession(event)
   try {
     const query = getQuery(event)
     const word = query.word as string
@@ -12,24 +13,15 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Word and category are required' })
     }
 
-    const filePath = path.resolve(process.cwd(), '../data/custom_keywords.json')
-    if (!fs.existsSync(filePath)) {
-      throw createError({ statusCode: 404, statusMessage: 'Keywords file not found' })
-    }
+    const result = await db.delete(keywords).where(
+      and(eq(keywords.word, word), eq(keywords.category, category))
+    )
     
-    const fileData = fs.readFileSync(filePath, 'utf-8')
-    const data = JSON.parse(fileData)
-    
-    if (data[category]) {
-      if (category === 'pattern') {
-        data[category] = data[category].filter((w: any) => (typeof w === 'string' ? w : w.word) !== word)
-      } else {
-        data[category] = data[category].filter((w: string) => w !== word)
-      }
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+    if (result.changes > 0) {
       return { success: true, message: `Removed '${word}' from ${category}` }
     } else {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid category' })
+      // Return success anyway, assuming it's already removed
+      return { success: true, message: `Removed '${word}' from ${category}` }
     }
   } catch (error: any) {
     throw createError({

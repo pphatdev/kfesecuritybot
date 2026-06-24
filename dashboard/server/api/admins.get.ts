@@ -1,20 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { db } from '../database'
+import { allowedUsers } from '../database/schema'
+import { eq } from 'drizzle-orm'
 
-export default defineEventHandler((event) => {
-  // Read from data/allowed_users.json
-  const allowedUsersPath = path.resolve(process.cwd(), '../data/allowed_users.json')
+export default defineEventHandler(async (event) => {
+  // Read from db
+  const dbUsers = await db.select().from(allowedUsers)
   
-  let allowedUsers = { usernames: [], user_ids: [] }
-  
-  if (fs.existsSync(allowedUsersPath)) {
-    try {
-      allowedUsers = JSON.parse(fs.readFileSync(allowedUsersPath, 'utf-8'))
-    } catch (e) {
-      console.error('Error reading allowed_users.json', e)
-    }
-  }
-
   // Also read from .env for super admins
   const envPath = path.resolve(process.cwd(), '../.env')
   let envAdmins: string[] = []
@@ -45,29 +38,27 @@ export default defineEventHandler((event) => {
     })
   }
 
-  // Add json allowed users (usernames)
-  for (const username of (allowedUsers.usernames || [])) {
-    // Avoid duplicates if also in env
-    if (!envAdmins.includes(username)) {
+  // Add db allowed users
+  for (const user of dbUsers) {
+    if (user.type === 'username') {
+      if (!envAdmins.includes(user.value)) {
+        adminsList.push({
+          id: `json_user_${user.value}`,
+          target: user.value,
+          type: 'username',
+          source: 'json',
+          label: `@${user.value}`
+        })
+      }
+    } else if (user.type === 'id') {
       adminsList.push({
-        id: `json_user_${username}`,
-        target: username,
-        type: 'username',
+        id: `json_id_${user.value}`,
+        target: user.value,
+        type: 'user_id', // Note: frontend uses 'user_id' but db schema has 'id'
         source: 'json',
-        label: `@${username}`
+        label: `ID: ${user.value}`
       })
     }
-  }
-
-  // Add json allowed users (user_ids)
-  for (const userId of (allowedUsers.user_ids || [])) {
-    adminsList.push({
-      id: `json_id_${userId}`,
-      target: userId,
-      type: 'user_id',
-      source: 'json',
-      label: `ID: ${userId}`
-    })
   }
 
   return { admins: adminsList }

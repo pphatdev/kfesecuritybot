@@ -4,51 +4,57 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from telegram.ext import Application
+from app.services.db import get_db
 
 logger = logging.getLogger(__name__)
 
-SCHEDULE_DB_FILE = os.path.join(os.path.dirname(__file__), '../../data/scheduled_messages.json')
-
-def load_scheduled_messages() -> list:
-    """Load all scheduled messages."""
-    if not os.path.exists(SCHEDULE_DB_FILE):
-        return []
+async def load_scheduled_messages() -> list:
     try:
-        with open(SCHEDULE_DB_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        async with await get_db() as db:
+            async with db.execute("SELECT id, message, chat_ids, send_at, status, created_at, file_path, file_type, sent_at, results, error FROM scheduled_messages WHERE status = 'pending'") as cursor:
+                rows = await cursor.fetchall()
+                messages = []
+                for row in rows:
+                    messages.append({
+                        "id": row[0],
+                        "message": row[1],
+                        "chatIds": json.loads(row[2]) if row[2] else [],
+                        "sendAt": row[3],
+                        "status": row[4],
+                        "createdAt": row[5],
+                        "file_path": row[6],
+                        "file_type": row[7],
+                        "sentAt": row[8],
+                        "results": json.loads(row[9]) if row[9] else {},
+                        "error": row[10]
+                    })
+                return messages
     except Exception as e:
-        logger.error(f"Error reading scheduled messages DB: {e}")
+        logger.error(f"Error loading scheduled messages: {e}")
         return []
 
-def save_scheduled_messages(messages: list):
-    """Save the scheduled messages list atomically."""
-    os.makedirs(os.path.dirname(SCHEDULE_DB_FILE), exist_ok=True)
-    temp_path = SCHEDULE_DB_FILE + '.tmp'
+async def save_scheduled_message(msg: dict):
     try:
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(messages, f, ensure_ascii=False, indent=2)
-        os.replace(temp_path, SCHEDULE_DB_FILE)
+        async with await get_db() as db:
+            await db.execute('''
+                UPDATE scheduled_messages 
+                SET status = ?, 
+                    sent_at = ?, 
+                    results = ?, 
+                    error = ?
+                WHERE id = ?
+            ''', (msg.get("status"), msg.get("sentAt"), json.dumps(msg.get("results", {})), msg.get("error"), msg.get("id")))
+            await db.commit()
     except Exception as e:
-        logger.error(f"Error saving scheduled messages DB: {e}")
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+        logger.error(f"Error saving scheduled message: {e}")
 
 async def check_and_send_scheduled_messages(application: Application):
-    """Scan and broadcast scheduled messages that are due."""
-    messages = load_scheduled_messages()
+    messages = await load_scheduled_messages()
     now_utc = datetime.now(timezone.utc)
     
-    modified = False
     for msg in messages:
-        if msg.get("status") != "pending":
-            continue
-            
         try:
             send_at_str = msg["sendAt"]
-            # Convert 'Z' to '+00:00' for compatibility with datetime.fromisoformat in older Pythons
             if send_at_str.endswith("Z"):
                 send_at_str = send_at_str[:-1] + "+00:00"
             send_at = datetime.fromisoformat(send_at_str)
@@ -56,13 +62,13 @@ async def check_and_send_scheduled_messages(application: Application):
             logger.error(f"Invalid datetime format for message {msg.get('id')}: {e}")
             msg["status"] = "failed"
             msg["error"] = f"Invalid datetime format: {e}"
-            modified = True
+            await save_scheduled_message(msg)
             continue
             
         if send_at <= now_utc:
             logger.info(f"Sending scheduled message: {msg.get('id')}")
             msg["status"] = "sending"
-            save_scheduled_messages(messages)
+            await save_scheduled_message(msg)
             
             chat_ids = msg.get("chatIds", [])
             text = msg.get("message", "")
@@ -95,7 +101,6 @@ async def check_and_send_scheduled_messages(application: Application):
                     logger.error(f"Failed to send scheduled message {msg.get('id')} to {chat_id}: {e}")
                     results[str(chat_id)] = {"success": False, "error": str(e)}
                     fail_count += 1
-                # Small delay to avoid hitting rate limits
                 await asyncio.sleep(0.1)
                 
             msg["results"] = results
@@ -108,31 +113,15 @@ async def check_and_send_scheduled_messages(application: Application):
             else:
                 msg["status"] = "partially_failed"
                 
-            # Reload in case something changed in the file during execution
-            latest_messages = load_scheduled_messages()
-            updated = False
-            for m in latest_messages:
-                if m.get("id") == msg.get("id"):
-                    m.update(msg)
-                    updated = True
-            if not updated:
-                latest_messages.append(msg)
-            messages = latest_messages
-            save_scheduled_messages(messages)
-            modified = False
+            await save_scheduled_message(msg)
             
-            # Clean up the file if it existed
             if file_path and os.path.exists(file_path):
                 try:
                     os.remove(file_path)
                 except Exception as e:
                     logger.error(f"Failed to delete scheduled media file {file_path}: {e}")
 
-    if modified:
-        save_scheduled_messages(messages)
-
 async def run_scheduler(application: Application):
-    """Background loop to check and send messages periodically."""
     logger.info("Scheduled message background worker starting...")
     while True:
         try:

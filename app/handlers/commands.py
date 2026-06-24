@@ -17,14 +17,32 @@ def _bot_intro_html(user_mention: str) -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     user = update.effective_user
-    track_user(user.id, user.username)
+    await track_user(user.id, user.username)
+    
+    if update.message and update.message.chat and update.message.chat.type == "private":
+        from app.services.private_chats_db import log_private_chat
+        await log_private_chat(
+            user_id=user.id,
+            username=user.username or user.first_name or "Unknown",
+            message=update.message.text or "/start"
+        )
+        
     await update.message.reply_html(_bot_intro_html(user.mention_html()))
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /help is issued."""
     user = update.effective_user
-    track_user(user.id, user.username)
+    await track_user(user.id, user.username)
+    
+    if update.message and update.message.chat and update.message.chat.type == "private":
+        from app.services.private_chats_db import log_private_chat
+        await log_private_chat(
+            user_id=user.id,
+            username=user.username or user.first_name or "Unknown",
+            message=update.message.text or "/help"
+        )
+        
     await update.message.reply_html(
         "ℹ️ <b>Help</b>\n\n"
         "I monitor group messages and remove harmful content automatically based on patterns configured in the web dashboard.\n\n"

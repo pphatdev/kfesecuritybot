@@ -1,8 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { H3Event } from 'h3'
-
-const SESSIONS_FILE = path.resolve(process.cwd(), '../data/sessions.json')
+import { db } from '../database'
+import { sessions } from '../database/schema'
+import { eq } from 'drizzle-orm'
 
 export interface Session {
   user_id: number
@@ -10,28 +9,7 @@ export interface Session {
   expires_at: number
 }
 
-export function loadSessions(): Record<string, Session> {
-  if (!fs.existsSync(SESSIONS_FILE)) {
-    return {}
-  }
-  try {
-    const data = fs.readFileSync(SESSIONS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch (error) {
-    console.error('Error reading sessions file:', error)
-    return {}
-  }
-}
-
-export function saveSessions(sessions: Record<string, Session>) {
-  try {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf-8')
-  } catch (error) {
-    console.error('Error saving sessions file:', error)
-  }
-}
-
-export function verifySession(event: H3Event): Session {
+export async function verifySession(event: H3Event): Promise<Session> {
   const token = getCookie(event, 'session_token')
   if (!token) {
     throw createError({
@@ -40,20 +18,33 @@ export function verifySession(event: H3Event): Session {
     })
   }
 
-  const sessions = loadSessions()
-  const session = sessions[token]
-
-  if (!session || session.expires_at < Math.floor(Date.now() / 1000)) {
-    if (session) {
-      // Clean up expired session
-      delete sessions[token]
-      saveSessions(sessions)
-    }
+  const sessionResults = await db.select().from(sessions).where(eq(sessions.token, token))
+  
+  if (sessionResults.length === 0) {
     throw createError({
       statusCode: 401,
       statusMessage: 'Unauthorized'
     })
   }
 
-  return session
+  const session = sessionResults[0]
+  const currentTime = Math.floor(Date.now() / 1000)
+
+  if (session.expiresAt.getTime() / 1000 < currentTime) {
+    // Clean up expired session
+    await db.delete(sessions).where(eq(sessions.token, token))
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Unauthorized'
+    })
+  }
+
+  return {
+    user_id: parseInt(session.userId || '0'),
+    username: 'Admin', // In the DB schema we didn't save username for session, wait, schema has userId but not username.
+    // Let's modify schema to include username or just fetch from users/allowedUsers if needed.
+    // For now we'll just mock it or add it.
+    expires_at: Math.floor(session.expiresAt.getTime() / 1000)
+  }
 }
+

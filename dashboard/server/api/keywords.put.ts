@@ -1,8 +1,9 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { db } from '../database'
+import { keywords } from '../database/schema'
+import { eq, and } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
-  verifySession(event)
+  await verifySession(event)
   try {
     const body = await readBody(event)
     const { category, oldWord, newWord, newResponse } = body
@@ -11,77 +12,37 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Category, oldWord, and newWord are required' })
     }
 
-    const filePath = path.resolve(process.cwd(), '../data/custom_keywords.json')
-    if (!fs.existsSync(filePath)) {
-      throw createError({ statusCode: 404, statusMessage: 'Keywords file not found' })
-    }
+    const trimmedOldWord = category === 'pattern' || category === 'sticker' ? oldWord.trim() : oldWord.trim().toLowerCase()
+    const trimmedNewWord = category === 'pattern' || category === 'sticker' ? newWord.trim() : newWord.trim().toLowerCase()
     
-    const fileData = fs.readFileSync(filePath, 'utf-8')
-    const data = JSON.parse(fileData)
-    
-    if (!data[category]) {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid category' })
+    // Check if new word exists if changing word
+    if (trimmedOldWord !== trimmedNewWord) {
+      const existing = await db.select().from(keywords).where(
+        and(eq(keywords.word, trimmedNewWord), eq(keywords.category, category))
+      )
+      if (existing.length > 0) {
+        throw createError({ statusCode: 400, statusMessage: 'New keyword already exists' })
+      }
     }
 
-    if (category === 'pattern') {
-      const lowerOldWord = oldWord.trim()
-      const lowerNewWord = newWord.trim()
+    const result = await db.update(keywords)
+      .set({ 
+        word: trimmedNewWord, 
+        response: category === 'pattern' ? newResponse || '' : null 
+      })
+      .where(and(eq(keywords.word, trimmedOldWord), eq(keywords.category, category)))
       
-      const idx = data.pattern.findIndex((p: any) => (typeof p === 'string' ? p : p.word) === lowerOldWord)
-      if (idx === -1) {
-        throw createError({ statusCode: 404, statusMessage: 'Original keyword not found' })
-      }
-      
-      // Check for conflict if word is changing
-      if (lowerOldWord !== lowerNewWord) {
-        const conflict = data.pattern.some((p: any) => (typeof p === 'string' ? p : p.word) === lowerNewWord)
-        if (conflict) {
-          throw createError({ statusCode: 400, statusMessage: 'New keyword already exists' })
-        }
-      }
-      
-      data.pattern[idx] = { word: lowerNewWord, response: newResponse || '' }
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      return { success: true, message: `Updated pattern '${lowerOldWord}'` }
-      
-    } else if (category === 'sticker') {
-      const trimmedOldWord = oldWord.trim()
-      const trimmedNewWord = newWord.trim()
-      
-      const idx = data[category].indexOf(trimmedOldWord)
-      if (idx === -1) {
-        throw createError({ statusCode: 404, statusMessage: 'Original keyword not found' })
-      }
-      
-      if (trimmedOldWord !== trimmedNewWord && data[category].includes(trimmedNewWord)) {
-        throw createError({ statusCode: 400, statusMessage: 'New keyword already exists' })
-      }
-      
-      data[category][idx] = trimmedNewWord
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      return { success: true, message: `Updated sticker '${trimmedOldWord}'` }
-      
+    if (result.changes > 0) {
+      return { success: true, message: `Updated keyword '${trimmedOldWord}'` }
     } else {
-      const lowerOldWord = oldWord.trim().toLowerCase()
-      const lowerNewWord = newWord.trim().toLowerCase()
-      
-      const idx = data[category].indexOf(lowerOldWord)
-      if (idx === -1) {
-        throw createError({ statusCode: 404, statusMessage: 'Original keyword not found' })
-      }
-      
-      if (lowerOldWord !== lowerNewWord && data[category].includes(lowerNewWord)) {
-        throw createError({ statusCode: 400, statusMessage: 'New keyword already exists' })
-      }
-      
-      data[category][idx] = lowerNewWord
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      return { success: true, message: `Updated keyword '${lowerOldWord}'` }
+      throw createError({ statusCode: 404, statusMessage: 'Original keyword not found' })
     }
+
   } catch (error: any) {
+    if (error.statusCode) throw error;
     throw createError({
-      statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Failed to update keyword'
+      statusCode: 500,
+      statusMessage: 'Failed to update keyword'
     })
   }
 })

@@ -1,9 +1,11 @@
-import fs from 'node:fs'
+import { db } from '../database'
+import { scheduledMessages } from '../database/schema'
 import path from 'node:path'
+import fs from 'node:fs'
 import crypto from 'node:crypto'
 
 export default defineEventHandler(async (event) => {
-  verifySession(event)
+  await verifySession(event)
   try {
     let message = ''
     let chatIds: string[] = []
@@ -35,56 +37,29 @@ export default defineEventHandler(async (event) => {
     }
 
     if (!fileData && (!message || typeof message !== 'string')) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Message is required when no file is attached'
-      })
+      throw createError({ statusCode: 400, statusMessage: 'Message is required when no file is attached' })
     }
 
     if (!chatIds || chatIds.length === 0) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'At least one target group must be selected'
-      })
+      throw createError({ statusCode: 400, statusMessage: 'At least one target group must be selected' })
     }
 
     if (!sendAt || typeof sendAt !== 'string') {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Schedule send time is required'
-      })
+      throw createError({ statusCode: 400, statusMessage: 'Schedule send time is required' })
     }
 
-    // Verify sendAt is a valid date and in the future
     const sendTime = new Date(sendAt).getTime()
     if (isNaN(sendTime)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid schedule date/time format'
-      })
+      throw createError({ statusCode: 400, statusMessage: 'Invalid schedule date/time format' })
     }
 
     if (sendTime <= Date.now()) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Schedule time must be in the future'
-      })
-    }
-
-    const filePath = path.resolve(process.cwd(), '../data/scheduled_messages.json')
-    let schedules: any[] = []
-
-    if (fs.existsSync(filePath)) {
-      try {
-        schedules = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-      } catch (e) {
-        console.error('Error reading scheduled_messages.json', e)
-      }
+      throw createError({ statusCode: 400, statusMessage: 'Schedule time must be in the future' })
     }
 
     const scheduleId = crypto.randomUUID()
-    let savedFilePath = null
-    let fileType = null
+    let savedFilePath: string | null = null
+    let fileType: string | null = null
 
     if (fileData) {
       const uploadsDir = path.resolve(process.cwd(), '../data/uploads')
@@ -107,30 +82,25 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const newSchedule: any = {
+    const newSchedule = {
       id: scheduleId,
       message,
-      chatIds,
+      chatIds, // Will be serialized by Drizzle since mode: 'json'
       sendAt,
       status: 'pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      filePath: savedFilePath,
+      fileType: fileType
     }
 
-    if (savedFilePath && fileType) {
-      newSchedule.file_path = savedFilePath
-      newSchedule.file_type = fileType
-    }
-
-    schedules.push(newSchedule)
-
-    fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    fs.writeFileSync(filePath, JSON.stringify(schedules, null, 2), 'utf-8')
+    await db.insert(scheduledMessages).values(newSchedule)
 
     return { success: true, schedule: newSchedule }
   } catch (error: any) {
+    if (error.statusCode) throw error
     throw createError({
-      statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Internal Server Error'
+      statusCode: 500,
+      statusMessage: 'Internal Server Error'
     })
   }
 })

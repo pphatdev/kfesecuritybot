@@ -490,27 +490,39 @@
                 </span>
               </td>
               <td class="py-3.5 px-4 text-right">
-                <button 
-                  v-if="schedule.status === 'pending'"
-                  type="button"
-                  @click="cancelSchedule(schedule.id)"
-                  :disabled="cancellingId === schedule.id"
-                  class="text-xs text-danger hover:text-red-700 bg-danger-subtle hover:bg-danger/25 px-2.5 py-1 rounded font-semibold disabled:opacity-50 transition-all inline-flex items-center gap-1"
-                >
-                  <IconTrash class="w-3.5 h-3.5" v-if="cancellingId !== schedule.id" />
-                  <IconLoader class="w-3.5 h-3.5 animate-spin" v-else />
-                  Cancel
-                </button>
-                <button 
-                  v-else
-                  type="button"
-                  @click="deleteScheduleHistory(schedule.id)"
-                  :disabled="cancellingId === schedule.id"
-                  class="text-xs text-(--text-muted) hover:text-danger hover:bg-danger-subtle px-2 py-1 rounded transition-all"
-                  title="Remove from history"
-                >
-                  <IconX class="w-4 h-4" />
-                </button>
+                <div class="flex items-center justify-end gap-2">
+                  <button 
+                    type="button"
+                    @click="reuseMessage(schedule)"
+                    class="text-xs text-primary hover:text-white bg-primary-subtle hover:bg-primary px-2.5 py-1 rounded font-semibold transition-all inline-flex items-center gap-1 cursor-pointer"
+                    title="Load message & recipients into composer to edit or resend"
+                  >
+                    <IconCopy class="w-3.5 h-3.5" />
+                    Reuse
+                  </button>
+
+                  <button 
+                    v-if="schedule.status === 'pending'"
+                    type="button"
+                    @click="cancelSchedule(schedule.id)"
+                    :disabled="cancellingId === schedule.id"
+                    class="text-xs text-danger hover:text-white bg-danger-subtle hover:bg-danger/80 px-2.5 py-1 rounded font-semibold disabled:opacity-50 transition-all inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <IconTrash class="w-3.5 h-3.5" v-if="cancellingId !== schedule.id" />
+                    <IconLoader class="w-3.5 h-3.5 animate-spin" v-else />
+                    Cancel
+                  </button>
+                  <button 
+                    v-else
+                    type="button"
+                    @click="deleteScheduleHistory(schedule.id)"
+                    :disabled="cancellingId === schedule.id"
+                    class="text-xs text-(--text-muted) hover:text-danger hover:bg-danger-subtle p-1 rounded transition-all cursor-pointer"
+                    title="Remove from history"
+                  >
+                    <IconX class="w-4 h-4" />
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -589,7 +601,8 @@ import {
   IconPaperclip,
   IconPhoto,
   IconMovie,
-  IconFileDescription
+  IconFileDescription,
+  IconCopy
 } from '@tabler/icons-vue'
 
 const message = ref('')
@@ -651,6 +664,11 @@ const formatFileSize = (bytes) => {
 }
 
 const announcementTemplates = [
+  {
+    name: 'Queue Schedule Sending',
+    icon: IconCalendarClock,
+    text: '<b>📅 Scheduled Announcement</b>\n\nDear members,\n\nThis is a scheduled message to notify you that:\n\n[Details of the scheduled announcement]\n\nThank you for your attention!\n\nBest regards,\nAdministration Team'
+  },
   {
     name: 'Maintenance Notice',
     icon: IconTool,
@@ -1022,6 +1040,32 @@ const deleteScheduleHistory = async (id) => {
   } finally {
     cancellingId.value = ''
   }
+}
+
+const reuseMessage = async (schedule) => {
+  if (message.value.trim() || selectedGroups.value.length > 0) {
+    const confirmed = await showConfirmModal(
+      'Load Selected Message?',
+      'Loading this message will overwrite your current composer draft (message content and selected recipients). Do you want to proceed?',
+      'warning'
+    )
+    if (!confirmed) return
+  }
+  
+  message.value = schedule.message || ''
+  
+  if (schedule.chatIds && Array.isArray(schedule.chatIds)) {
+    const availableGroupIds = groups.value.map(g => g.id.toString())
+    selectedGroups.value = schedule.chatIds
+      .map(id => id.toString())
+      .filter(id => availableGroupIds.includes(id))
+  } else {
+    selectedGroups.value = []
+  }
+  
+  router.push({ query: { tab: 'send' } })
+  success.value = 'Message and recipients loaded into the composer.'
+  error.value = ''
 }
 
 const sendAnnouncement = async () => {

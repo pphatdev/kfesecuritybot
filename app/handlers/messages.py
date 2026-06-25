@@ -135,7 +135,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- Step 1: Keyword pre-check against built-in + custom admin list ---
-    pre_result = pre_check(text, sticker=message.sticker)
+    pre_result = await pre_check(text, sticker=message.sticker, bot=context.bot)
 
     if pre_result:
         match_type, custom_reason = pre_result if isinstance(pre_result, tuple) else (pre_result, None)

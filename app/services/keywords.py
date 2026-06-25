@@ -1,7 +1,12 @@
 import json
 import logging
 import re
+import time
 from pathlib import Path
+
+# Cache for sticker set unique file IDs: set_name -> (timestamp, [unique_ids])
+_sticker_set_cache = {}
+STICKER_CACHE_TTL = 3600  # 1 hour
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +139,38 @@ def get_custom_keywords() -> dict:
     return _load_all()
 
 
-def pre_check(text: str, sticker=None) -> tuple[str, str | None] | None:
+async def get_sticker_index(sticker, bot) -> int:
+    """Get the 0-based index of a sticker within its sticker pack (set). Cached for 1 hour."""
+    if not sticker or not sticker.set_name or not bot:
+        return -1
+    
+    set_name = sticker.set_name
+    now = time.time()
+    
+    # Check cache
+    if set_name in _sticker_set_cache:
+        timestamp, unique_ids = _sticker_set_cache[set_name]
+        if now - timestamp < STICKER_CACHE_TTL:
+            try:
+                return unique_ids.index(sticker.file_unique_id)
+            except ValueError:
+                return -1
+                
+    # Fetch from Telegram API
+    try:
+        sticker_set = await bot.get_sticker_set(set_name)
+        unique_ids = [s.file_unique_id for s in sticker_set.stickers]
+        _sticker_set_cache[set_name] = (now, unique_ids)
+        try:
+            return unique_ids.index(sticker.file_unique_id)
+        except ValueError:
+            return -1
+    except Exception as e:
+        logger.error(f"Error fetching sticker set {set_name}: {e}")
+        return -1
+
+
+async def pre_check(text: str, sticker=None, bot=None) -> tuple[str, str | None] | None:
     """
     Check text against keyword lists.
     All keywords are read from the JSON file on every call — no restart needed.
@@ -152,13 +188,30 @@ def pre_check(text: str, sticker=None) -> tuple[str, str | None] | None:
             return ("Toxic", None)
 
     if sticker:
+        logger.info(f"[Sticker Check] Checking sticker. set_name={sticker.set_name}, emoji={sticker.emoji}, file_unique_id={sticker.file_unique_id}")
         for kw in data.get("sticker", []):
             kw_str = kw.strip()
             kw_lower = kw_str.lower()
+            logger.info(f"[Sticker Check] Comparing against rule: {kw_str}")
             if kw_lower.startswith("pack:"):
-                target = kw_str[5:]
-                if sticker.set_name and target.lower() == sticker.set_name.lower():
-                    return ("Sticker", f"Banned Sticker Pack ({sticker.set_name})")
+                # kw_str can be "pack:name", "pack:name:emoji", or "pack:name:index"
+                parts = kw_str[5:].split(":", 1)
+                target_pack = parts[0].strip()
+                
+                if sticker.set_name and target_pack.lower() == sticker.set_name.lower():
+                    if len(parts) == 1:
+                        # Ban entire pack
+                        return ("Sticker", f"Banned Sticker Pack ({sticker.set_name})")
+                    else:
+                        sub_target = parts[1].strip()
+                        if sub_target.isdigit():
+                            target_index = int(sub_target)
+                            sticker_idx = await get_sticker_index(sticker, bot)
+                            if sticker_idx == target_index:
+                                return ("Sticker", f"Banned Sticker in Pack {sticker.set_name} at index {target_index}")
+                        else:
+                            if sticker.emoji and sub_target == sticker.emoji:
+                                return ("Sticker", f"Banned Sticker Emoji ({sticker.emoji}) in Pack ({sticker.set_name})")
             elif kw_lower.startswith("emoji:"):
                 target = kw_str[6:]
                 if sticker.emoji and target == sticker.emoji:

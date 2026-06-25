@@ -4,6 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  sourcemap: {
+    server: false,
+    client: false
+  },
   css: ['~/assets/css/main.css'],
   modules: [
     '@primevue/nuxt-module',
@@ -24,6 +28,17 @@ export default defineNuxtConfig({
     plugins: [
       tailwindcss(),
     ],
+    build: {
+      sourcemap: false,
+      rollupOptions: {
+        onwarn(warning, defaultHandler) {
+          if (warning.code === 'SOURCEMAP_ERROR' || warning.message.includes('Sourcemap is likely to be incorrect')) {
+            return
+          }
+          defaultHandler(warning)
+        }
+      }
+    }
   },
   primevue: {
     options: {

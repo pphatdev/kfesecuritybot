@@ -3,6 +3,9 @@ export default defineEventHandler(async (event) => {
     let message = ''
     let chatIds: string[] = []
     let fileData: any = null
+    let buttons: Array<{ text: string, url: string }> = []
+    let buttonText = ''
+    let buttonUrl = ''
 
     // Check content type to see if it's multipart
     const contentType = getRequestHeader(event, 'content-type') || ''
@@ -17,6 +20,16 @@ export default defineEventHandler(async (event) => {
             chatIds.push(field.data.toString('utf-8'))
           } else if (field.name === 'file') {
             fileData = field
+          } else if (field.name === 'buttons') {
+            try {
+              buttons = JSON.parse(field.data.toString('utf-8'))
+            } catch (e) {
+              console.error('Failed to parse buttons JSON:', e)
+            }
+          } else if (field.name === 'buttonText') {
+            buttonText = field.data.toString('utf-8')
+          } else if (field.name === 'buttonUrl') {
+            buttonUrl = field.data.toString('utf-8')
           }
         }
       }
@@ -24,6 +37,11 @@ export default defineEventHandler(async (event) => {
       const body = await readBody(event)
       message = body.message
       chatIds = Array.isArray(body.chatIds) ? body.chatIds : [body.chatIds]
+      if (body.buttons) {
+        buttons = Array.isArray(body.buttons) ? body.buttons : []
+      }
+      buttonText = body.buttonText || ''
+      buttonUrl = body.buttonUrl || ''
     }
 
     if (!fileData && (!message || typeof message !== 'string')) {
@@ -69,6 +87,26 @@ export default defineEventHandler(async (event) => {
       apiUrl = `https://api.telegram.org/bot${botToken}/${method}`
     }
 
+    // Construct inline keyboard markup (each button in its own row)
+    let inlineKeyboard: any[] = []
+    if (buttons && buttons.length > 0) {
+      inlineKeyboard = buttons
+        .filter(btn => btn.text && btn.text.trim() && btn.url && btn.url.trim())
+        .map(btn => [
+          { text: btn.text.trim(), url: btn.url.trim() }
+        ])
+    } else if (buttonText.trim() && buttonUrl.trim()) {
+      inlineKeyboard = [
+        [
+          { text: buttonText.trim(), url: buttonUrl.trim() }
+        ]
+      ]
+    }
+
+    const replyMarkup = inlineKeyboard.length > 0 ? {
+      inline_keyboard: inlineKeyboard
+    } : null
+
     // Send to each chat concurrently using Promise.allSettled
     const requests = chatIds.map(async (chatId) => {
       let fetchOptions: any = { method: 'POST' }
@@ -78,16 +116,23 @@ export default defineEventHandler(async (event) => {
         fd.append('chat_id', chatId)
         fd.append('caption', message)
         fd.append('parse_mode', 'HTML')
+        if (replyMarkup) {
+          fd.append('reply_markup', JSON.stringify(replyMarkup))
+        }
         const blob = new Blob([fileData.data], { type: fileData.type || 'application/octet-stream' })
         fd.append(mediaType, blob, fileData.filename || 'file')
         fetchOptions.body = fd
       } else {
         fetchOptions.headers = { 'Content-Type': 'application/json' }
-        fetchOptions.body = JSON.stringify({
+        const payload: any = {
           chat_id: chatId,
           text: message,
           parse_mode: 'HTML'
-        })
+        }
+        if (replyMarkup) {
+          payload.reply_markup = replyMarkup
+        }
+        fetchOptions.body = JSON.stringify(payload)
       }
 
       const tgResponse = await fetch(apiUrl, fetchOptions)

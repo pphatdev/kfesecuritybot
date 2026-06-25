@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-6xl mx-auto space-y-6">
+  <div class="mx-auto space-y-6">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
@@ -164,6 +164,81 @@
                 <span>Supports Telegram HTML syntax</span>
                 <span :class="{'text-danger font-medium': message.length > 4000}">{{ message.length }} / 4000</span>
               </div>
+            </div>
+
+            <!-- Link Buttons Option (Optional) -->
+            <div class="mt-6 border-t border-(--border-color) pt-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Add Link Buttons</span>
+                  <span class="text-[10px] text-(--text-muted) opacity-80">(Telegram Inline Keyboard)</span>
+                </div>
+                <!-- Custom Premium Toggle/Switch -->
+                <button 
+                  type="button"
+                  @click="hasButtons = !hasButtons"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  :class="hasButtons ? 'bg-primary' : 'bg-slate-500/20'"
+                >
+                  <span 
+                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                    :class="hasButtons ? 'translate-x-5' : 'translate-x-0'"
+                  />
+                </button>
+              </div>
+
+              <!-- Animated Expandable Input Fields -->
+              <Transition
+                enter-active-class="transition duration-200 ease-out"
+                enter-from-class="opacity-0 -translate-y-2"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-150 ease-in"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 -translate-y-2"
+              >
+                <div v-if="hasButtons" class="space-y-3 bg-slate-500/5 p-4 rounded-xl border border-(--border-color) animate-in fade-in slide-in-from-top-2">
+                  <div v-for="(btn, index) in buttons" :key="index" class="flex flex-col sm:flex-row gap-3 items-end sm:items-center bg-(--bg-card) p-3 rounded-lg border border-(--border-color) shadow-sm">
+                    <div class="flex-1 w-full space-y-1">
+                      <label :for="'btnText-' + index" class="block text-[10px] font-semibold text-(--text-muted) uppercase tracking-wider">Button Label</label>
+                      <input 
+                        :id="'btnText-' + index" 
+                        type="text" 
+                        v-model="btn.text" 
+                        placeholder="e.g. Visit Website"
+                        class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-3 py-1.5 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        required
+                      />
+                    </div>
+                    <div class="flex-1 w-full space-y-1">
+                      <label :for="'btnUrl-' + index" class="block text-[10px] font-semibold text-(--text-muted) uppercase tracking-wider">Button URL</label>
+                      <input 
+                        :id="'btnUrl-' + index" 
+                        type="url" 
+                        v-model="btn.url" 
+                        placeholder="e.g. https://example.com"
+                        class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-3 py-1.5 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        required
+                      />
+                    </div>
+                    <button 
+                      type="button"
+                      @click="removeButton(index)"
+                      class="w-8 h-8 hover:bg-danger/10 text-(--text-muted) hover:text-danger rounded-lg flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-(--border-color) hover:border-danger/20"
+                      title="Remove Button"
+                    >
+                      <IconTrash class="w-4 h-4" />
+                    </button>
+                  </div>
+                  <button 
+                    type="button" 
+                    @click="addButton"
+                    class="flex items-center gap-1.5 px-3 py-2 bg-primary-subtle hover:bg-primary/20 text-primary border border-primary/10 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                  >
+                    <IconPlus class="w-3.5 h-3.5" />
+                    <span>Add Button</span>
+                  </button>
+                </div>
+              </Transition>
             </div>
 
             <!-- DateTime / Cron Picker (Only in Schedule Tab) -->
@@ -533,7 +608,20 @@
           <tbody class="divide-y divide-(--border-color) text-sm">
             <tr v-for="schedule in sortedSchedules" :key="schedule.id" class="hover:bg-(--bg-layout)/50 transition-colors">
               <td class="py-3.5 px-4 font-normal text-(--text-body) max-w-xs sm:max-w-md truncate">
-                <span class="font-medium text-(--text-heading)" :title="schedule.message">{{ truncateText(schedule.message, 60) }}</span>
+                <div class="flex flex-col gap-1">
+                  <span class="font-medium text-(--text-heading)" :title="schedule.message">{{ truncateText(schedule.message, 60) }}</span>
+                  <!-- Display Buttons configured -->
+                  <div v-if="schedule.buttons && schedule.buttons.length > 0" class="flex flex-wrap gap-1 mt-1">
+                    <span v-for="(btn, bIdx) in schedule.buttons" :key="bIdx" class="text-[10px] text-(--text-muted) inline-flex items-center gap-0.5 bg-slate-500/5 px-1 py-0.5 rounded border border-(--border-color)" :title="btn.url">
+                      <IconLink class="w-2.5 h-2.5 text-primary shrink-0" />
+                      {{ btn.text }}
+                    </span>
+                  </div>
+                  <span v-else-if="schedule.button_text" class="text-[10px] text-(--text-muted) flex items-center gap-1" :title="schedule.button_url">
+                    <IconLink class="w-3 h-3 text-primary shrink-0" />
+                    Button: <span class="font-semibold text-(--text-heading)">{{ schedule.button_text }}</span>
+                  </span>
+                </div>
               </td>
               <td class="py-3.5 px-4">
                 <div class="flex items-center gap-1.5">
@@ -760,12 +848,33 @@ import {
   IconMovie,
   IconFileDescription,
   IconCopy,
-  IconScissors
+  IconScissors,
+  IconLink,
+  IconPlus
 } from '@tabler/icons-vue'
 
 const message = ref('')
 const selectedGroups = ref([])
 const searchQuery = ref('')
+const hasButtons = ref(false)
+const buttons = ref([])
+
+const addButton = () => {
+  buttons.value.push({ text: '', url: '' })
+}
+
+const removeButton = (index) => {
+  buttons.value.splice(index, 1)
+  if (buttons.value.length === 0) {
+    hasButtons.value = false
+  }
+}
+
+watch(hasButtons, (val) => {
+  if (val && buttons.value.length === 0) {
+    addButton()
+  }
+})
 const error = ref('')
 const success = ref('')
 const sending = ref(false)
@@ -1354,6 +1463,17 @@ const reuseMessage = async (schedule) => {
   
   message.value = schedule.message || ''
   
+  if (schedule.buttons && Array.isArray(schedule.buttons) && schedule.buttons.length > 0) {
+    hasButtons.value = true
+    buttons.value = JSON.parse(JSON.stringify(schedule.buttons))
+  } else if (schedule.button_text && schedule.button_url) {
+    hasButtons.value = true
+    buttons.value = [{ text: schedule.button_text, url: schedule.button_url }]
+  } else {
+    hasButtons.value = false
+    buttons.value = []
+  }
+
   if (schedule.chatIds && Array.isArray(schedule.chatIds)) {
     const availableGroupIds = groups.value.map(g => g.id.toString())
     selectedGroups.value = schedule.chatIds
@@ -1386,6 +1506,12 @@ const sendAnnouncement = async () => {
     if (attachedFile.value) {
       formData.append('file', attachedFile.value)
     }
+    if (hasButtons.value && buttons.value.length > 0) {
+      const validButtons = buttons.value.filter(b => b.text.trim() && b.url.trim())
+      if (validButtons.length > 0) {
+        formData.append('buttons', JSON.stringify(validButtons))
+      }
+    }
 
     if (activeTab.value === 'schedule') {
       if (scheduleType.value === 'once') {
@@ -1404,6 +1530,8 @@ const sendAnnouncement = async () => {
         selectedGroups.value = []
         scheduleTime.value = ''
         attachedFile.value = null
+        hasButtons.value = false
+        buttons.value = []
         if (previewUrl.value) {
           URL.revokeObjectURL(previewUrl.value)
           previewUrl.value = null
@@ -1422,6 +1550,8 @@ const sendAnnouncement = async () => {
         message.value = ''
         selectedGroups.value = []
         attachedFile.value = null
+        hasButtons.value = false
+        buttons.value = []
         if (previewUrl.value) {
           URL.revokeObjectURL(previewUrl.value)
           previewUrl.value = null

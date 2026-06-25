@@ -85,6 +85,20 @@ async def check_and_send_scheduled_messages(application: Application):
             file_path = msg.get("file_path")
             file_type = msg.get("file_type")
             
+            buttons_config = msg.get("buttons", [])
+            reply_markup = None
+            if buttons_config:
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+                keyboard = []
+                for btn in buttons_config:
+                    if btn.get("text") and btn.get("url"):
+                        keyboard.append([InlineKeyboardButton(text=btn["text"], url=btn["url"])])
+                if keyboard:
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+            elif msg.get("button_text") and msg.get("button_url"):
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+                reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text=msg["button_text"], url=msg["button_url"])]])
+            
             results = {}
             success_count = 0
             fail_count = 0
@@ -94,16 +108,17 @@ async def check_and_send_scheduled_messages(application: Application):
                     if file_path and os.path.exists(file_path):
                         with open(file_path, 'rb') as media_file:
                             if file_type == 'photo':
-                                await application.bot.send_photo(chat_id=chat_id, photo=media_file, caption=text, parse_mode="HTML")
+                                await application.bot.send_photo(chat_id=chat_id, photo=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
                             elif file_type == 'video':
-                                await application.bot.send_video(chat_id=chat_id, video=media_file, caption=text, parse_mode="HTML")
+                                await application.bot.send_video(chat_id=chat_id, video=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
                             else:
-                                await application.bot.send_document(chat_id=chat_id, document=media_file, caption=text, parse_mode="HTML")
+                                await application.bot.send_document(chat_id=chat_id, document=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
                     else:
                         await application.bot.send_message(
                             chat_id=chat_id,
                             text=text,
-                            parse_mode="HTML"
+                            parse_mode="HTML",
+                            reply_markup=reply_markup
                         )
                     results[str(chat_id)] = {"success": True}
                     success_count += 1

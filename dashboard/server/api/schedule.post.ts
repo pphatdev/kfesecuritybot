@@ -10,6 +10,9 @@ export default defineEventHandler(async (event) => {
     let sendAt = ''
     let cron = ''
     let fileData: any = null
+    let buttons: Array<{ text: string, url: string }> = []
+    let buttonText = ''
+    let buttonUrl = ''
 
     const contentType = getRequestHeader(event, 'content-type') || ''
     
@@ -27,6 +30,16 @@ export default defineEventHandler(async (event) => {
             cron = field.data.toString('utf-8')
           } else if (field.name === 'file') {
             fileData = field
+          } else if (field.name === 'buttons') {
+            try {
+              buttons = JSON.parse(field.data.toString('utf-8'))
+            } catch (e) {
+              console.error('Failed to parse buttons JSON:', e)
+            }
+          } else if (field.name === 'buttonText') {
+            buttonText = field.data.toString('utf-8')
+          } else if (field.name === 'buttonUrl') {
+            buttonUrl = field.data.toString('utf-8')
           }
         }
       }
@@ -36,6 +49,11 @@ export default defineEventHandler(async (event) => {
       chatIds = Array.isArray(body.chatIds) ? body.chatIds : [body.chatIds]
       sendAt = body.sendAt
       cron = body.cron
+      if (body.buttons) {
+        buttons = Array.isArray(body.buttons) ? body.buttons : []
+      }
+      buttonText = body.buttonText || ''
+      buttonUrl = body.buttonUrl || ''
     }
 
     if (!fileData && (!message || typeof message !== 'string')) {
@@ -130,6 +148,15 @@ export default defineEventHandler(async (event) => {
       cron: cron ? cron.trim() : null,
       status: 'pending',
       createdAt: new Date().toISOString()
+    }
+
+    if (buttons && buttons.length > 0) {
+      newSchedule.buttons = buttons.filter(btn => btn.text && btn.text.trim() && btn.url && btn.url.trim())
+    }
+
+    if (buttonText.trim() && buttonUrl.trim()) {
+      newSchedule.button_text = buttonText.trim()
+      newSchedule.button_url = buttonUrl.trim()
     }
 
     if (savedFilePath && fileType) {

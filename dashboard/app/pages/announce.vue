@@ -83,25 +83,74 @@
               </h2>
             </div>
 
-            <!-- Template Selector -->
-            <div class="mb-5 bg-slate-500/5 border border-(--border-color) rounded-lg p-3">
-              <label class="block text-[11px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">Quick-Select Announcement Templates</label>
-              <div class="flex flex-wrap gap-2">
+            <!-- Media Upload (Compact Chat UX Style) -->
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <span class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Attachment</span>
+                  <span class="text-[10px] text-(--text-muted) opacity-80">(Optional, Max 50MB)</span>
+                </div>
+                
+                <!-- Compact Attachment Trigger Button (Only if no file attached) -->
                 <button 
-                  v-for="tpl in announcementTemplates" 
-                  :key="tpl.name"
+                  v-if="!attachedFile"
                   type="button" 
-                  @click="applyTemplate(tpl.text)"
-                  class="px-3 py-1.5 bg-(--bg-card) hover:bg-slate-500/10 border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-body) hover:text-(--text-heading) transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  @click="triggerFileInput"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-500/5 hover:bg-slate-500/10 border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-body) transition-all cursor-pointer shadow-sm hover:text-primary"
                 >
-                  <component :is="tpl.icon" class="w-3.5 h-3.5 text-primary" />
-                  {{ tpl.name }}
+                  <IconPaperclip class="w-3.5 h-3.5 text-primary" />
+                  <span>Attach Media</span>
+                </button>
+              </div>
+              
+              <input 
+                type="file" 
+                ref="fileInput" 
+                @change="handleFileChange" 
+                class="hidden" 
+                accept="image/*,video/*,application/pdf,application/zip,.doc,.docx,.xls,.xlsx"
+              />
+
+              <!-- Compact Media Preview State -->
+              <div v-if="attachedFile" class="flex items-center gap-3 bg-slate-500/5 border border-(--border-color) rounded-lg p-2.5 w-fit max-w-full">
+                <!-- Thumbnail -->
+                <div class="w-10 h-10 rounded-md bg-primary-subtle text-primary flex items-center justify-center shrink-0 overflow-hidden border border-(--border-color)">
+                  <img v-if="attachedFile.type.startsWith('image/') && previewUrl" :src="previewUrl" class="w-full h-full object-cover" />
+                  <IconMovie v-else-if="attachedFile.type.startsWith('video/')" class="w-5 h-5" />
+                  <IconFileDescription v-else class="w-5 h-5" />
+                </div>
+                
+                <!-- Info -->
+                <div class="flex flex-col min-w-0 pr-1 text-xs">
+                  <span class="font-semibold text-(--text-heading) truncate max-w-[150px] sm:max-w-[250px]">{{ attachedFile.name }}</span>
+                  <span class="text-(--text-muted) font-mono opacity-80 mt-0.5">{{ formatFileSize(attachedFile.size) }}</span>
+                </div>
+                
+                <!-- Crop Button (Only for images) -->
+                <button 
+                  v-if="attachedFile.type.startsWith('image/')"
+                  type="button" 
+                  @click="openCropModal" 
+                  class="w-6 h-6 hover:bg-primary/10 text-(--text-muted) hover:text-primary rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  title="Crop Image"
+                >
+                  <IconScissors class="w-4 h-4" />
+                </button>
+
+                <!-- Remove Button -->
+                <button 
+                  type="button" 
+                  @click.prevent="removeFile" 
+                  class="w-6 h-6 hover:bg-danger/10 text-(--text-muted) hover:text-danger rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  title="Remove attachment"
+                >
+                  <IconX class="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             <!-- Textarea -->
-            <div class="space-y-2">
+            <div class="mt-6 border-t border-(--border-color) pt-5 space-y-2">
               <label for="message" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Message Body</label>
               <textarea 
                 id="message" 
@@ -117,209 +166,202 @@
               </div>
             </div>
 
-            <!-- Media Upload -->
-            <div class="mt-6 border-t border-(--border-color) pt-5 space-y-4">
-              <div class="flex items-center justify-between">
-                <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Attach Media <span class="normal-case font-normal text-[10px]">(Optional, Max 50MB)</span></label>
-              </div>
-              
-              <input 
-                type="file" 
-                ref="fileInput" 
-                @change="handleFileChange" 
-                class="hidden" 
-                accept="image/*,video/*,application/pdf,application/zip,.doc,.docx,.xls,.xlsx"
-              />
-
-              <!-- Default Upload State -->
-              <div v-if="!attachedFile" 
-                   @click="triggerFileInput"
-                   class="border-2 border-dashed border-(--border-color) hover:border-primary/50 bg-(--bg-layout) hover:bg-primary-subtle/30 rounded-xl p-6 transition-all flex flex-col items-center justify-center cursor-pointer group"
-              >
-                <div class="w-12 h-12 bg-slate-500/10 group-hover:bg-primary/10 rounded-full flex items-center justify-center mb-3 transition-colors">
-                  <IconPaperclip class="w-6 h-6 text-(--text-muted) group-hover:text-primary transition-colors" />
-                </div>
-                <p class="text-sm font-medium text-(--text-heading)">Click to upload a file</p>
-                <p class="text-xs text-(--text-muted) mt-1">Images, videos, or documents</p>
+            <!-- DateTime / Cron Picker (Only in Schedule Tab) -->
+            <div v-if="activeTab === 'schedule'" class="mt-6 border-t border-(--border-color) pt-5 space-y-4">
+              <!-- Schedule Type Toggle -->
+              <div class="flex items-center gap-4 bg-slate-500/5 px-4 py-2 rounded-lg border border-(--border-color) w-fit">
+                <label class="flex items-center gap-2 text-xs font-bold text-(--text-body) uppercase tracking-wider cursor-pointer">
+                  <input type="radio" v-model="scheduleType" value="once" class="text-primary focus:ring-primary focus:ring-offset-0 bg-transparent border-(--border-color)" />
+                  One-time
+                </label>
+                <label class="flex items-center gap-2 text-xs font-bold text-(--text-body) uppercase tracking-wider cursor-pointer">
+                  <input type="radio" v-model="scheduleType" value="recurring" class="text-primary focus:ring-primary focus:ring-offset-0 bg-transparent border-(--border-color)" />
+                  Recurring (Cron)
+                </label>
               </div>
 
-              <!-- Media Preview State -->
-              <div v-else class="relative rounded-xl border border-(--border-color) shadow-sm bg-(--bg-card) overflow-hidden group">
-                <!-- Remove Button Overlay -->
-                <button 
-                  type="button" 
-                  @click.prevent="removeFile" 
-                  class="absolute top-2 right-2 z-10 w-8 h-8 bg-black/50 hover:bg-danger/80 backdrop-blur-sm text-white rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-sm cursor-pointer"
-                  title="Remove attachment"
-                >
-                  <IconX class="w-4 h-4" />
-                </button>
-
-                <!-- Image/Video Preview -->
-                <div v-if="previewUrl" class="w-full flex items-center justify-center bg-black/5 relative max-h-[300px]">
-                  <img v-if="attachedFile.type.startsWith('image/')" :src="previewUrl" class="w-full h-full object-contain max-h-[300px]" alt="Attachment preview" />
-                  <video v-if="attachedFile.type.startsWith('video/')" :src="previewUrl" controls class="w-full h-full object-contain max-h-[300px]"></video>
-                </div>
+              <!-- One-time Datepicker -->
+              <div v-if="scheduleType === 'once'" class="space-y-2">
+                <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Scheduled Time</label>
                 
-                <!-- Document Preview (No URL) -->
-                <div v-else class="w-full flex items-center justify-center bg-slate-500/5 py-12">
-                   <IconFileDescription class="w-16 h-16 text-(--text-muted) opacity-50" />
-                </div>
-
-                <!-- File Info Footer -->
-                <div class="p-3 bg-(--bg-card) border-t border-(--border-color) flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-lg bg-primary-subtle text-primary flex items-center justify-center shrink-0">
-                    <IconPhoto v-if="attachedFile.type.startsWith('image/')" class="w-5 h-5" />
-                    <IconMovie v-else-if="attachedFile.type.startsWith('video/')" class="w-5 h-5" />
-                    <IconFileDescription v-else class="w-5 h-5" />
-                  </div>
-                  <div class="flex flex-col min-w-0">
-                    <span class="text-sm font-semibold text-(--text-heading) truncate">{{ attachedFile.name }}</span>
-                    <span class="text-xs text-(--text-muted) font-mono">{{ formatFileSize(attachedFile.size) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- DateTime Picker (Only in Schedule Tab) -->
-            <div v-if="activeTab === 'schedule'" class="mt-6 border-t border-(--border-color) pt-5 space-y-2">
-              <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Scheduled Time</label>
-              
-              <div class="relative w-full" ref="pickerContainer">
-                <!-- Trigger Button -->
-                <button 
-                  type="button" 
-                  @click="toggleDropdown"
-                  class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-2.5 text-sm text-(--text-body) text-left focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all flex items-center justify-between shadow-inner cursor-pointer"
-                >
-                  <div class="flex items-center gap-2">
-                    <IconCalendarClock class="w-4 h-4 text-primary" />
-                    <span :class="{'text-(--text-muted)': !scheduleTime}">
-                      {{ formattedScheduleTime || 'Select date & time' }}
-                    </span>
-                  </div>
-                  <IconChevronDown class="w-4 h-4 text-(--text-muted) transition-transform duration-200" :class="{'rotate-180': isDropdownOpen}" />
-                </button>
-                
-                <!-- Popover Dropdown overlay panel -->
-                <div 
-                  v-if="isDropdownOpen" 
-                  class="absolute left-0 mt-2 z-30 bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) p-4 w-[340px] select-none text-left animate-fade-in"
-                >
-                  <!-- Month & Year Selector Header -->
-                  <div class="flex items-center justify-between pb-3 border-b border-(--border-color) mb-3">
-                    <button 
-                      type="button" 
-                      @click="prevMonth" 
-                      class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
-                    >
-                      <IconChevronLeft class="w-4 h-4" />
-                    </button>
-                    <span class="text-sm font-semibold text-(--text-heading)">
-                      {{ monthNames[currentMonth] }} {{ currentYear }}
-                    </span>
-                    <button 
-                      type="button" 
-                      @click="nextMonth" 
-                      class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
-                    >
-                      <IconChevronRight class="w-4 h-4" />
-                    </button>
-                  </div>
+                <div class="relative w-full" ref="pickerContainer">
+                  <!-- Trigger Button -->
+                  <button 
+                    type="button" 
+                    @click="toggleDropdown"
+                    class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-2.5 text-sm text-(--text-body) text-left focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all flex items-center justify-between shadow-inner cursor-pointer"
+                  >
+                    <div class="flex items-center gap-2">
+                      <IconCalendarClock class="w-4 h-4 text-primary" />
+                      <span :class="{'text-(--text-muted)': !scheduleTime}">
+                        {{ formattedScheduleTime || 'Select date & time' }}
+                      </span>
+                    </div>
+                    <IconChevronDown class="w-4 h-4 text-(--text-muted) transition-transform duration-200" :class="{'rotate-180': isDropdownOpen}" />
+                  </button>
                   
-                  <!-- Week Days Headers -->
-                  <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                    <span>Su</span>
-                    <span>Mo</span>
-                    <span>Tu</span>
-                    <span>We</span>
-                    <span>Th</span>
-                    <span>Fr</span>
-                    <span>Sa</span>
-                  </div>
-                  
-                  <!-- Calendar Day Cells -->
-                  <div class="grid grid-cols-7 gap-1 text-center">
-                    <div v-for="(cell, idx) in calendarCells" :key="idx" class="aspect-square flex items-center justify-center">
-                      <span v-if="cell.type === 'empty'" class="w-8 h-8"></span>
-                      <button
-                        v-else
-                        type="button"
-                        @click="selectDay(cell)"
-                        :disabled="cell.disabled"
-                        class="w-8 h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer"
-                        :class="[
-                          isSameDay(cell.date, selectedDate)
-                            ? 'bg-primary text-white shadow-sm font-bold'
-                            : cell.disabled
-                              ? 'opacity-25 cursor-not-allowed text-(--text-muted)'
-                              : 'text-(--text-body) hover:bg-slate-500/10 hover:text-(--text-heading)'
-                        ]"
+                  <!-- Popover Dropdown overlay panel -->
+                  <div 
+                    v-if="isDropdownOpen" 
+                    class="absolute left-0 mt-2 z-30 bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) p-4 w-[340px] select-none text-left animate-fade-in"
+                  >
+                    <!-- Month & Year Selector Header -->
+                    <div class="flex items-center justify-between pb-3 border-b border-(--border-color) mb-3">
+                      <button 
+                        type="button" 
+                        @click="prevMonth" 
+                        class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
                       >
-                        {{ cell.day }}
+                        <IconChevronLeft class="w-4 h-4" />
+                      </button>
+                      <span class="text-sm font-semibold text-(--text-heading)">
+                        {{ monthNames[currentMonth] }} {{ currentYear }}
+                      </span>
+                      <button 
+                        type="button" 
+                        @click="nextMonth" 
+                        class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
+                      >
+                        <IconChevronRight class="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                  
-                  <!-- Time Picker Section -->
-                  <div class="flex items-center justify-between border-t border-(--border-color) pt-3 mt-3">
-                    <span class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">Time</span>
-                    <div class="flex items-center gap-1.5 bg-slate-500/5 px-2.5 py-1 rounded-xl border border-(--border-color)">
-                      <!-- Hour Selector Dropdown -->
-                      <select 
-                        v-model="selectedHour" 
-                        @change="updateScheduleTime" 
-                        class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
-                      >
-                        <option v-for="h in 12" :key="h" :value="h" class="bg-(--bg-card) text-(--text-heading)">{{ String(h).padStart(2, '0') }}</option>
-                      </select>
-                      
-                      <span class="text-(--text-muted) font-semibold">:</span>
-                      
-                      <!-- Minute Selector Dropdown -->
-                      <select 
-                        v-model="selectedMinute" 
-                        @change="updateScheduleTime" 
-                        class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
-                      >
-                        <option v-for="m in 60" :key="m-1" :value="m-1" class="bg-(--bg-card) text-(--text-heading)">{{ String(m-1).padStart(2, '0') }}</option>
-                      </select>
-                      
-                      <!-- AM/PM Toggle Segment -->
-                      <div class="flex border-l border-(--border-color) pl-2 ml-1 gap-1">
-                        <button 
-                          type="button" 
-                          @click="selectedAmPm = 'AM'; updateScheduleTime()"
-                          class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                          :class="selectedAmPm === 'AM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
+                    
+                    <!-- Week Days Headers -->
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
+                      <span>Su</span>
+                      <span>Mo</span>
+                      <span>Tu</span>
+                      <span>We</span>
+                      <span>Th</span>
+                      <span>Fr</span>
+                      <span>Sa</span>
+                    </div>
+                    
+                    <!-- Calendar Day Cells -->
+                    <div class="grid grid-cols-7 gap-1 text-center">
+                      <div v-for="(cell, idx) in calendarCells" :key="idx" class="aspect-square flex items-center justify-center">
+                        <span v-if="cell.type === 'empty'" class="w-8 h-8"></span>
+                        <button
+                          type="button"
+                          @click="selectDay(cell)"
+                          :disabled="cell.disabled"
+                          class="w-8 h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer"
+                          :class="[
+                            isSameDay(cell.date, selectedDate)
+                              ? 'bg-primary text-white shadow-sm font-bold'
+                              : cell.disabled
+                                ? 'opacity-25 cursor-not-allowed text-(--text-muted)'
+                                : 'text-(--text-body) hover:bg-slate-500/10 hover:text-(--text-heading)'
+                          ]"
                         >
-                          AM
-                        </button>
-                        <button 
-                          type="button" 
-                          @click="selectedAmPm = 'PM'; updateScheduleTime()"
-                          class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                          :class="selectedAmPm === 'PM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
-                        >
-                          PM
+                          {{ cell.day }}
                         </button>
                       </div>
                     </div>
+                    
+                    <!-- Time Picker Section -->
+                    <div class="flex items-center justify-between border-t border-(--border-color) pt-3 mt-3">
+                      <span class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">Time</span>
+                      <div class="flex items-center gap-1.5 bg-slate-500/5 px-2.5 py-1 rounded-xl border border-(--border-color)">
+                        <!-- Hour Selector Dropdown -->
+                        <select 
+                          v-model="selectedHour" 
+                          @change="updateScheduleTime" 
+                          class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
+                        >
+                          <option v-for="h in 12" :key="h" :value="h" class="bg-(--bg-card) text-(--text-heading)">{{ String(h).padStart(2, '0') }}</option>
+                        </select>
+                        
+                        <span class="text-(--text-muted) font-semibold">:</span>
+                        
+                        <!-- Minute Selector Dropdown -->
+                        <select 
+                          v-model="selectedMinute" 
+                          @change="updateScheduleTime" 
+                          class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
+                        >
+                          <option v-for="m in 60" :key="m-1" :value="m-1" class="bg-(--bg-card) text-(--text-heading)">{{ String(m-1).padStart(2, '0') }}</option>
+                        </select>
+                        
+                        <!-- AM/PM Toggle Segment -->
+                        <div class="flex border-l border-(--border-color) pl-2 ml-1 gap-1">
+                          <button 
+                            type="button" 
+                            @click="selectedAmPm = 'AM'; updateScheduleTime()"
+                            class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                            :class="selectedAmPm === 'AM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
+                          >
+                            AM
+                          </button>
+                          <button 
+                            type="button" 
+                            @click="selectedAmPm = 'PM'; updateScheduleTime()"
+                            class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                            :class="selectedAmPm === 'PM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
+                          >
+                            PM
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Dropdown Action Footer -->
+                    <div class="flex justify-end mt-3 pt-2 border-t border-(--border-color)">
+                      <button 
+                        type="button" 
+                        @click="isDropdownOpen = false" 
+                        class="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer"
+                      >
+                        Apply
+                      </button>
+                    </div>
                   </div>
-                  
-                  <!-- Dropdown Action Footer -->
-                  <div class="flex justify-end mt-3 pt-2 border-t border-(--border-color)">
+                </div>
+                <p class="text-xs text-(--text-muted)">The announcement will be queued and sent automatically at this local time.</p>
+              </div>
+
+              <!-- Recurring Cron Expression Input -->
+              <div v-else class="space-y-3">
+                <div class="space-y-2">
+                  <label for="cron" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Cron Expression</label>
+                  <input 
+                    id="cron" 
+                    type="text" 
+                    v-model="cronExpression" 
+                    placeholder="e.g. */30 * * * * or 0 9 * * 1"
+                    class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-2.5 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-inner"
+                    required
+                  />
+                  <!-- Active Cron Description Badge -->
+                  <div v-if="cronExpression.trim()" class="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary-subtle/50 px-2.5 py-1.5 rounded-lg border border-primary/20 w-fit">
+                    <IconCheck class="w-3.5 h-3.5 shrink-0" />
+                    <span>Active Schedule: {{ activeCronDescription }}</span>
+                  </div>
+                </div>
+
+                <!-- Cron Templates -->
+                <div class="bg-slate-500/5 border border-(--border-color) rounded-lg p-3 space-y-2">
+                  <span class="block text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">Quick-Select Cron Templates</span>
+                  <div class="flex flex-wrap gap-1.5">
                     <button 
+                      v-for="tpl in cronTemplates" 
+                      :key="tpl.label"
                       type="button" 
-                      @click="isDropdownOpen = false" 
-                      class="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer"
+                      @click="cronExpression = tpl.expr"
+                      class="px-2.5 py-1 border rounded text-[11px] font-semibold transition-all cursor-pointer shadow-sm"
+                      :class="cronExpression.trim() === tpl.expr ? 'bg-primary border-primary text-white hover:bg-primary-hover hover:text-white shadow-md' : 'bg-(--bg-card) border-(--border-color) text-(--text-body) hover:bg-slate-500/10 hover:text-(--text-heading)'"
+                      :title="tpl.expr"
                     >
-                      Apply
+                      {{ tpl.label }}
                     </button>
                   </div>
                 </div>
+
+                <div class="text-xs text-(--text-muted) space-y-1 mt-1 leading-relaxed">
+                  <p>Format: <code>minute hour day-of-month month day-of-week</code> (5 space-separated values).</p>
+                  <p>Examples: <code>0 9 * * 1</code> (Every Monday at 9:00 AM) or <code>0 0 * * *</code> (Daily at midnight).</p>
+                </div>
               </div>
-              <p class="text-xs text-(--text-muted)">The announcement will be queued and sent automatically at this local time.</p>
             </div>
           </div>
         </div>
@@ -327,6 +369,25 @@
         <!-- Right Column: Select Recipients & Actions -->
         <div class="lg:col-span-4 space-y-6">
           
+          <!-- Templates Card -->
+          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
+            <h2 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+              Announcement Templates
+            </h2>
+            <div class="flex flex-col gap-2">
+              <button 
+                v-for="tpl in announcementTemplates" 
+                :key="tpl.name"
+                type="button" 
+                @click="applyTemplate(tpl.text)"
+                class="w-full px-3 py-2 bg-slate-500/5 hover:bg-slate-500/10 border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-body) hover:text-(--text-heading) transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <component :is="tpl.icon" class="w-4 h-4 text-primary shrink-0" />
+                {{ tpl.name }}
+              </button>
+            </div>
+          </div>
+
           <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) flex flex-col h-[500px]">
             <div class="p-5 border-b border-(--border-color) shrink-0">
               <div class="flex items-center justify-between mb-3">
@@ -406,7 +467,7 @@
           <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
              <button 
                 type="submit" 
-                :disabled="sending || (!message.trim() && !attachedFile) || selectedGroups.length === 0 || (activeTab === 'schedule' && !scheduleTime)"
+                :disabled="sending || (!message.trim() && !attachedFile) || selectedGroups.length === 0 || (activeTab === 'schedule' && ((scheduleType === 'once' && !scheduleTime) || (scheduleType === 'recurring' && !cronExpression.trim())))"
                 class="w-full py-3.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-hover focus:ring-4 focus:ring-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
               >
                 <IconSend v-if="!sending && activeTab === 'send'" class="w-5 h-5" />
@@ -482,7 +543,13 @@
                 </div>
               </td>
               <td class="py-3.5 px-4 font-mono text-xs text-(--text-muted)">
-                {{ formatDateTime(schedule.sendAt) }}
+                <div class="flex flex-col gap-1">
+                  <span>{{ formatDateTime(schedule.sendAt) || 'Calculating...' }}</span>
+                  <span v-if="schedule.cron" class="text-[10px] bg-primary-subtle text-primary border border-primary/20 px-1.5 py-0.5 rounded-lg w-fit inline-flex items-center gap-1" title="Cron Expression">
+                    <IconRefresh class="w-3 h-3 animate-spin-slow" />
+                    {{ schedule.cron }}
+                  </span>
+                </div>
               </td>
               <td class="py-3.5 px-4">
                 <span :class="getStatusBadgeClass(schedule.status)" class="text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
@@ -571,6 +638,96 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Cropping Modal -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="showCropModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+        <div class="bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) max-w-xl w-full overflow-hidden p-6 space-y-4 transform scale-100 transition-all select-none">
+          <div class="flex items-center justify-between border-b border-(--border-color) pb-3">
+            <h3 class="text-base font-semibold text-(--text-heading) flex items-center gap-2">
+              <IconScissors class="w-4 h-4 text-primary" />
+              Crop Image
+            </h3>
+            <button 
+              type="button" 
+              @click="showCropModal = false" 
+              class="text-(--text-muted) hover:text-(--text-heading) hover:bg-slate-500/10 p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <IconX class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Crop Container Workspace -->
+          <div class="relative overflow-hidden flex items-center justify-center bg-black/40 rounded-xl border border-(--border-color) min-h-[300px] max-h-[450px]">
+            <div ref="cropContainerEl" class="relative max-w-full max-h-full overflow-hidden w-fit">
+              <img 
+                ref="cropImageEl"
+                :src="cropImageSrc" 
+                class="object-contain max-h-[400px] select-none pointer-events-none" 
+                alt="Image to crop"
+              />
+              
+              <!-- Draggable Crop Box Overlay -->
+              <div 
+                class="absolute border-2 border-primary cursor-move select-none"
+                :style="{
+                  left: cropBox.x + '%',
+                  top: cropBox.y + '%',
+                  width: cropBox.w + '%',
+                  height: cropBox.h + '%',
+                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)'
+                }"
+                @mousedown="startDrag"
+              >
+                <!-- Grid Lines (Premium Aesthetic) -->
+                <div class="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-30">
+                  <div class="border-b border-dashed border-white"></div>
+                  <div class="border-b border-dashed border-white"></div>
+                  <div class="border-b border-dashed border-white"></div>
+                  <div class="border-r border-dashed border-white"></div>
+                  <div class="border-r border-dashed border-white"></div>
+                  <div class="border-r border-dashed border-white"></div>
+                </div>
+
+                <!-- Resize Handle bottom-right -->
+                <div 
+                  class="absolute bottom-0 right-0 w-4 h-4 bg-primary border-2 border-white rounded-full translate-x-1/2 translate-y-1/2 cursor-se-resize shadow-md hover:scale-125 transition-transform"
+                  @mousedown="startResize"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crop Footer Controls -->
+          <div class="flex items-center justify-between pt-2 border-t border-(--border-color)">
+            <p class="text-xs text-(--text-muted)">Drag the selection to move; drag the bottom-right dot to resize.</p>
+            <div class="flex gap-3">
+              <button 
+                type="button" 
+                @click="showCropModal = false"
+                class="px-4 py-2 border border-(--border-color) hover:bg-(--bg-layout) rounded-lg text-xs font-semibold text-(--text-body) hover:text-(--text-heading) transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                @click="saveCrop"
+                class="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer"
+              >
+                Apply Crop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -602,7 +759,8 @@ import {
   IconPhoto,
   IconMovie,
   IconFileDescription,
-  IconCopy
+  IconCopy,
+  IconScissors
 } from '@tabler/icons-vue'
 
 const message = ref('')
@@ -665,7 +823,7 @@ const formatFileSize = (bytes) => {
 
 const announcementTemplates = [
   {
-    name: 'Queue Schedule Sending',
+    name: 'Schedule Send',
     icon: IconCalendarClock,
     text: '<b>📅 Scheduled Announcement</b>\n\nDear members,\n\nThis is a scheduled message to notify you that:\n\n[Details of the scheduled announcement]\n\nThank you for your attention!\n\nBest regards,\nAdministration Team'
   },
@@ -689,6 +847,15 @@ const announcementTemplates = [
     icon: IconInfoCircle,
     text: '<b>📢 Official Announcement</b>\n\nDear members,\n\n[Your announcement text here]\n\nBest regards,\nAdministration Team'
   }
+]
+
+const cronTemplates = [
+  { label: 'Every 30 Mins', expr: '*/30 * * * *' },
+  { label: 'Every Hour', expr: '0 * * * *' },
+  { label: 'Daily at 9 AM', expr: '0 9 * * *' },
+  { label: 'Daily at Midnight', expr: '0 0 * * *' },
+  { label: 'Weekly (Mon 9 AM)', expr: '0 9 * * 1' },
+  { label: 'Monthly (1st at Midnight)', expr: '0 0 1 * *' }
 ]
 
 const confirmModal = ref({
@@ -736,8 +903,141 @@ const router = useRouter()
 const route = useRoute()
 
 const activeTab = computed(() => route.query.tab || 'send')
+const activeCronDescription = computed(() => {
+  const expr = cronExpression.value.trim()
+  if (!expr) return ''
+  const tpl = cronTemplates.find(t => t.expr === expr)
+  if (tpl) {
+    return `${tpl.label} (${expr})`
+  }
+  return `Custom (${expr})`
+})
 const scheduleTime = ref('')
+const scheduleType = ref('once')
+const cronExpression = ref('')
 const loadingSchedules = ref(false)
+
+// Draggable/Resizable Cropper Logic
+const showCropModal = ref(false)
+const cropImageSrc = ref('')
+const cropBox = ref({ x: 15, y: 15, w: 70, h: 70 })
+const cropImageEl = ref(null)
+const cropContainerEl = ref(null)
+
+const openCropModal = () => {
+  if (previewUrl.value) {
+    cropImageSrc.value = previewUrl.value
+    cropBox.value = { x: 15, y: 15, w: 70, h: 70 }
+    showCropModal.value = true
+  }
+}
+
+let isDragging = false
+let isResizing = false
+let startMouseX = 0
+let startMouseY = 0
+let startBoxX = 0
+let startBoxY = 0
+let startBoxW = 0
+let startBoxH = 0
+
+const startDrag = (e) => {
+  e.preventDefault()
+  isDragging = true
+  startMouseX = e.clientX
+  startMouseY = e.clientY
+  startBoxX = cropBox.value.x
+  startBoxY = cropBox.value.y
+  document.addEventListener('mousemove', handleDrag)
+  document.addEventListener('mouseup', stopDragOrResize)
+}
+
+const handleDrag = (e) => {
+  if (!isDragging || !cropContainerEl.value) return
+  const dx = ((e.clientX - startMouseX) / cropContainerEl.value.clientWidth) * 100
+  const dy = ((e.clientY - startMouseY) / cropContainerEl.value.clientHeight) * 100
+  
+  let newX = startBoxX + dx
+  let newY = startBoxY + dy
+  
+  newX = Math.max(0, Math.min(100 - cropBox.value.w, newX))
+  newY = Math.max(0, Math.min(100 - cropBox.value.h, newY))
+  
+  cropBox.value.x = newX
+  cropBox.value.y = newY
+}
+
+const startResize = (e) => {
+  e.preventDefault()
+  e.stopPropagation()
+  isResizing = true
+  startMouseX = e.clientX
+  startMouseY = e.clientY
+  startBoxW = cropBox.value.w
+  startBoxH = cropBox.value.h
+  document.addEventListener('mousemove', handleResize)
+  document.addEventListener('mouseup', stopDragOrResize)
+}
+
+const handleResize = (e) => {
+  if (!isResizing || !cropContainerEl.value) return
+  const dw = ((e.clientX - startMouseX) / cropContainerEl.value.clientWidth) * 100
+  const dh = ((e.clientY - startMouseY) / cropContainerEl.value.clientHeight) * 100
+  
+  let newW = startBoxW + dw
+  let newH = startBoxH + dh
+  
+  newW = Math.max(10, Math.min(100 - cropBox.value.x, newW))
+  newH = Math.max(10, Math.min(100 - cropBox.value.y, newH))
+  
+  cropBox.value.w = newW
+  cropBox.value.h = newH
+}
+
+const stopDragOrResize = () => {
+  isDragging = false
+  isResizing = false
+  document.removeEventListener('mousemove', handleDrag)
+  document.removeEventListener('mousemove', handleResize)
+  document.removeEventListener('mouseup', stopDragOrResize)
+}
+
+const saveCrop = () => {
+  const img = cropImageEl.value
+  if (!img) return
+  
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  
+  const naturalWidth = img.naturalWidth
+  const naturalHeight = img.naturalHeight
+  
+  const sx = (cropBox.value.x / 100) * naturalWidth
+  const sy = (cropBox.value.y / 100) * naturalHeight
+  const sw = (cropBox.value.w / 100) * naturalWidth
+  const sh = (cropBox.value.h / 100) * naturalHeight
+  
+  canvas.width = sw
+  canvas.height = sh
+  
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
+  
+  canvas.toBlob((blob) => {
+    if (!blob) return
+    
+    const croppedFile = new File([blob], attachedFile.value.name, {
+      type: attachedFile.value.type || 'image/jpeg',
+      lastModified: Date.now()
+    })
+    
+    attachedFile.value = croppedFile
+    
+    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = URL.createObjectURL(croppedFile)
+    
+    showCropModal.value = false
+  }, attachedFile.value.type || 'image/jpeg', 0.95)
+}
 const schedules = ref([])
 const cancellingId = ref('')
 
@@ -1070,7 +1370,10 @@ const reuseMessage = async (schedule) => {
 
 const sendAnnouncement = async () => {
   if ((!message.value.trim() && !attachedFile.value) || selectedGroups.value.length === 0) return
-  if (activeTab.value === 'schedule' && !scheduleTime.value) return
+  if (activeTab.value === 'schedule') {
+    if (scheduleType.value === 'once' && !scheduleTime.value) return
+    if (scheduleType.value === 'recurring' && !cronExpression.value.trim()) return
+  }
   
   error.value = ''
   success.value = ''
@@ -1085,8 +1388,12 @@ const sendAnnouncement = async () => {
     }
 
     if (activeTab.value === 'schedule') {
-      const utcString = new Date(scheduleTime.value).toISOString()
-      formData.append('sendAt', utcString)
+      if (scheduleType.value === 'once') {
+        const utcString = new Date(scheduleTime.value).toISOString()
+        formData.append('sendAt', utcString)
+      } else {
+        formData.append('cron', cronExpression.value.trim())
+      }
       
       const res = await $fetch('/api/schedule', {
         method: 'POST',

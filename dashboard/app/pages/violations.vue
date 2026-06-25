@@ -100,12 +100,56 @@
         </div>
       </div>
     </div>
+
+    <!-- Custom Modal/Alert Dialog -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="modal.show" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) max-w-md w-full overflow-hidden p-6 space-y-4 transform scale-100 transition-all select-none">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" :class="modal.type === 'danger' ? 'bg-danger-subtle text-danger' : modal.type === 'warning' ? 'bg-warning-subtle text-warning' : 'bg-success-subtle text-success'">
+              <IconAlertTriangle class="w-5 h-5" v-if="modal.type === 'danger'" />
+              <IconAlertCircle class="w-5 h-5" v-else-if="modal.type === 'warning'" />
+              <IconCheck class="w-5 h-5" v-else />
+            </div>
+            <div class="space-y-1 flex-1">
+              <h3 class="text-base font-semibold text-(--text-heading)">{{ modal.title }}</h3>
+              <p class="text-sm text-(--text-muted) leading-relaxed">{{ modal.message }}</p>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button 
+              v-if="modal.isConfirm"
+              type="button" 
+              @click="closeModal(false)"
+              class="px-4 py-2 border border-(--border-color) hover:bg-(--bg-layout) rounded-lg text-sm font-semibold text-(--text-body) hover:text-(--text-heading) transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              @click="closeModal(true)"
+              class="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all cursor-pointer shadow-md hover:shadow-lg"
+              :class="modal.type === 'danger' ? 'bg-danger hover:bg-danger/90' : 'bg-primary hover:bg-primary-hover'"
+            >
+              {{ modal.isConfirm ? 'Confirm' : 'OK' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
-import { IconAlertTriangle, IconShield, IconRefresh } from '@tabler/icons-vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { IconAlertTriangle, IconShield, IconRefresh, IconAlertCircle, IconCheck } from '@tabler/icons-vue'
 
 const { data: stats, pending, refresh } = useFetch('/api/stats')
 
@@ -165,8 +209,45 @@ function getAvatarStyle(username) {
   }
 }
 
+const modal = ref({
+  show: false,
+  title: '',
+  message: '',
+  type: 'warning',
+  isConfirm: false,
+  onConfirm: null
+})
+
+const showModal = (title, message, type = 'warning', isConfirm = false) => {
+  return new Promise((resolve) => {
+    modal.value = {
+      show: true,
+      title,
+      message,
+      type,
+      isConfirm,
+      onConfirm: (result) => {
+        modal.value.show = false
+        resolve(result)
+      }
+    }
+  })
+}
+
+const closeModal = (result) => {
+  if (modal.value.onConfirm) {
+    modal.value.onConfirm(result)
+  }
+}
+
 async function resetStrikes(userId, username) {
-  if (!confirm(`Are you sure you want to clear all violation strikes for @${username}?`)) return
+  const confirmed = await showModal(
+    'Clear Strikes?',
+    `Are you sure you want to clear all violation strikes for @${username}?`,
+    'warning',
+    true
+  )
+  if (!confirmed) return
   
   try {
     await $fetch(`/api/violations?userId=${userId}`, {
@@ -174,7 +255,7 @@ async function resetStrikes(userId, username) {
     })
     await refresh()
   } catch (err) {
-    alert('Failed to reset strikes: ' + err.message)
+    showModal('Failed to reset strikes', err.message, 'danger', false)
   }
 }
 </script>

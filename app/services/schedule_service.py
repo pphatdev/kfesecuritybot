@@ -46,6 +46,22 @@ async def check_and_send_scheduled_messages(application: Application):
         if msg.get("status") != "pending":
             continue
             
+        cron_expr = msg.get("cron")
+        if cron_expr and (not msg.get("sendAt") or msg.get("sendAt") == ""):
+            try:
+                from croniter import croniter
+                base_time = datetime.now(timezone.utc)
+                iter = croniter(cron_expr, base_time)
+                next_time = iter.get_next(datetime)
+                msg["sendAt"] = next_time.isoformat().replace("+00:00", "Z")
+                modified = True
+            except Exception as e:
+                logger.error(f"Invalid cron expression for message {msg.get('id')}: {e}")
+                msg["status"] = "failed"
+                msg["error"] = f"Invalid cron expression: {e}"
+                modified = True
+                continue
+                
         try:
             send_at_str = msg["sendAt"]
             # Convert 'Z' to '+00:00' for compatibility with datetime.fromisoformat in older Pythons
@@ -101,12 +117,33 @@ async def check_and_send_scheduled_messages(application: Application):
             msg["results"] = results
             msg["sentAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             
-            if fail_count == 0:
-                msg["status"] = "sent"
-            elif success_count == 0:
-                msg["status"] = "failed"
+            if msg.get("cron"):
+                try:
+                    from croniter import croniter
+                    base_time = datetime.now(timezone.utc)
+                    iter = croniter(msg["cron"], base_time)
+                    next_time = iter.get_next(datetime)
+                    msg["sendAt"] = next_time.isoformat().replace("+00:00", "Z")
+                    msg["status"] = "pending"
+                    
+                    if "history" not in msg:
+                        msg["history"] = []
+                    msg["history"].append({
+                        "sentAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                        "results": results,
+                        "status": "sent" if fail_count == 0 else ("failed" if success_count == 0 else "partially_failed")
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to reschedule cron message {msg.get('id')}: {e}")
+                    msg["status"] = "failed"
+                    msg["error"] = f"Rescheduling failed: {e}"
             else:
-                msg["status"] = "partially_failed"
+                if fail_count == 0:
+                    msg["status"] = "sent"
+                elif success_count == 0:
+                    msg["status"] = "failed"
+                else:
+                    msg["status"] = "partially_failed"
                 
             # Reload in case something changed in the file during execution
             latest_messages = load_scheduled_messages()
@@ -121,8 +158,8 @@ async def check_and_send_scheduled_messages(application: Application):
             save_scheduled_messages(messages)
             modified = False
             
-            # Clean up the file if it existed
-            if file_path and os.path.exists(file_path):
+            # Clean up the file if it existed, but NOT for recurring cron schedules
+            if file_path and os.path.exists(file_path) and not msg.get("cron"):
                 try:
                     os.remove(file_path)
                 except Exception as e:

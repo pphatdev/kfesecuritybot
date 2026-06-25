@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
     let message = ''
     let chatIds: string[] = []
     let sendAt = ''
+    let cron = ''
     let fileData: any = null
 
     const contentType = getRequestHeader(event, 'content-type') || ''
@@ -22,6 +23,8 @@ export default defineEventHandler(async (event) => {
             chatIds.push(field.data.toString('utf-8'))
           } else if (field.name === 'sendAt') {
             sendAt = field.data.toString('utf-8')
+          } else if (field.name === 'cron') {
+            cron = field.data.toString('utf-8')
           } else if (field.name === 'file') {
             fileData = field
           }
@@ -32,6 +35,7 @@ export default defineEventHandler(async (event) => {
       message = body.message
       chatIds = Array.isArray(body.chatIds) ? body.chatIds : [body.chatIds]
       sendAt = body.sendAt
+      cron = body.cron
     }
 
     if (!fileData && (!message || typeof message !== 'string')) {
@@ -48,27 +52,38 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    if (!sendAt || typeof sendAt !== 'string') {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Schedule send time is required'
-      })
-    }
+    if (cron) {
+      const cronRegex = /^(\S+\s+){4}\S+$/
+      if (!cronRegex.test(cron.trim())) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Invalid cron expression format (must have exactly 5 fields)'
+        })
+      }
+      sendAt = ''
+    } else {
+      if (!sendAt || typeof sendAt !== 'string') {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Schedule send time or cron expression is required'
+        })
+      }
 
-    // Verify sendAt is a valid date and in the future
-    const sendTime = new Date(sendAt).getTime()
-    if (isNaN(sendTime)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid schedule date/time format'
-      })
-    }
+      // Verify sendAt is a valid date and in the future
+      const sendTime = new Date(sendAt).getTime()
+      if (isNaN(sendTime)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Invalid schedule date/time format'
+        })
+      }
 
-    if (sendTime <= Date.now()) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Schedule time must be in the future'
-      })
+      if (sendTime <= Date.now()) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Schedule time must be in the future'
+        })
+      }
     }
 
     const filePath = path.resolve(process.cwd(), '../data/scheduled_messages.json')
@@ -112,6 +127,7 @@ export default defineEventHandler(async (event) => {
       message,
       chatIds,
       sendAt,
+      cron: cron ? cron.trim() : null,
       status: 'pending',
       createdAt: new Date().toISOString()
     }

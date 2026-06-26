@@ -15,15 +15,15 @@ export default defineEventHandler(async (event) => {
     const linkRegex = /(?:t\.me|telegram\.me)\/addstickers\/([a-zA-Z0-9_]+)/i
     const linkMatch = name.match(linkRegex)
     if (linkMatch) {
-      name = linkMatch[1]
+      name = linkMatch[1]!
     } else {
       const tgRegex = /tg:\/\/addstickers\?set=([a-zA-Z0-9_]+)/i
       const tgMatch = name.match(tgRegex)
       if (tgMatch) {
-        name = tgMatch[1]
+        name = tgMatch[1]!
       } else if (name.includes('/')) {
         const parts = name.split('/')
-        const last = parts[parts.length - 1].trim()
+        const last = parts[parts.length - 1]?.trim()
         if (last) name = last
       }
     }

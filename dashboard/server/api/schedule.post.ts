@@ -10,6 +10,8 @@ export default defineEventHandler(async (event) => {
     let sendAt = ''
     let cron = ''
     let fileData: any = null
+    let stickerId = ''
+    let stickerThumbId = ''
     let buttons: Array<{ text: string, url: string }> = []
     let buttonText = ''
     let buttonUrl = ''
@@ -30,6 +32,10 @@ export default defineEventHandler(async (event) => {
             cron = field.data.toString('utf-8')
           } else if (field.name === 'file') {
             fileData = field
+          } else if (field.name === 'stickerId') {
+            stickerId = field.data.toString('utf-8')
+          } else if (field.name === 'stickerThumbId') {
+            stickerThumbId = field.data.toString('utf-8')
           } else if (field.name === 'buttons') {
             try {
               buttons = JSON.parse(field.data.toString('utf-8'))
@@ -49,6 +55,8 @@ export default defineEventHandler(async (event) => {
       chatIds = Array.isArray(body.chatIds) ? body.chatIds : [body.chatIds]
       sendAt = body.sendAt
       cron = body.cron
+      stickerId = body.stickerId || ''
+      stickerThumbId = body.stickerThumbId || ''
       if (body.buttons) {
         buttons = Array.isArray(body.buttons) ? body.buttons : []
       }
@@ -56,10 +64,10 @@ export default defineEventHandler(async (event) => {
       buttonUrl = body.buttonUrl || ''
     }
 
-    if (!fileData && (!message || typeof message !== 'string')) {
+    if (!fileData && !stickerId && (!message || typeof message !== 'string')) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Message is required when no file is attached'
+        statusMessage: 'Message is required when no file or sticker is attached'
       })
     }
 
@@ -159,7 +167,11 @@ export default defineEventHandler(async (event) => {
       newSchedule.button_url = buttonUrl.trim()
     }
 
-    if (savedFilePath && fileType) {
+    if (stickerId) {
+      newSchedule.sticker_id = stickerId
+      newSchedule.sticker_thumb_id = stickerThumbId || null
+      newSchedule.file_type = 'sticker'
+    } else if (savedFilePath && fileType) {
       newSchedule.file_path = savedFilePath
       newSchedule.file_type = fileType
     }

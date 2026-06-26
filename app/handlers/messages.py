@@ -54,6 +54,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     text = text.strip()
 
+    # Log incoming message to chat history
+    try:
+        sender_id = message.from_user.id if message.from_user else None
+        if message.from_user:
+            sender = message.from_user.username or message.from_user.first_name
+        elif message.sender_chat:
+            sender = message.sender_chat.title
+        else:
+            sender = "System"
+            
+        sticker_id = message.sticker.file_id if message.sticker else None
+        media_type = None
+        media_name = None
+        if message.photo:
+            media_type = "photo"
+            media_name = "Photo"
+        elif message.video:
+            media_type = "video"
+            media_name = getattr(message.video, "file_name", "Video")
+        elif message.document:
+            media_type = "document"
+            media_name = getattr(message.document, "file_name", "Document")
+            
+        from app.services.chat_history import log_message
+        log_message(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            sender_id=sender_id,
+            sender=sender,
+            text=text or (f"[{media_name}]" if media_name else ""),
+            is_bot=False,
+            sticker_id=sticker_id,
+            media_type=media_type,
+            media_name=media_name
+        )
+    except Exception as e:
+        logger.error(f"Error logging chat history: {e}")
+
     if not text:
         return
 
@@ -131,6 +169,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_mentioned:
         logger.info(f"Bot mentioned/greeted by {username}, replying.")
+        # Log the mention or reply to appropriate DB
+        if message.chat and message.chat.type != "private":
+            from app.services.groups_db import record_group_mention_or_reply
+            record_group_mention_or_reply(message.chat.id, message.chat.title)
+        elif message.from_user:
+            from app.services.users_db import record_user_mention_or_reply
+            record_user_mention_or_reply(message.from_user.id, message.from_user.username)
+            
         await _reply_mention(message)
         return
 
@@ -173,7 +219,8 @@ async def _reply_mention(message):
         return
     user = message.from_user
     try:
-        await message.reply_html(_bot_intro_html(user.mention_html()))
+        reply_html_content = _bot_intro_html(user.mention_html())
+        sent_message = await message.reply_html(reply_html_content)
         logger.info(f"Mention reply sent to {user.first_name}.")
     except Exception as e:
         logger.error(f"Failed to send mention reply to {user.first_name}: {e}")
@@ -206,6 +253,11 @@ async def _delete_and_notify(message, reason: str, source: str, category: str = 
     try:
         await message.delete()
         logger.info(f"Deleted harmful message (source: {source})")
+        try:
+            from app.services.chat_history import mark_message_deleted
+            mark_message_deleted(message.chat.id, message.message_id, reason)
+        except Exception as he:
+            logger.error(f"Error marking message as deleted in history: {he}")
     except (BadRequest, Forbidden) as e:
         logger.warning(f"Could not delete message: {e}")
 
@@ -223,7 +275,7 @@ async def _delete_and_notify(message, reason: str, source: str, category: str = 
             f"📋 <b>Reason:</b> {reason}"
         )
 
-    await message.chat.send_message(
+    sent_warning = await message.chat.send_message(
         text=text,
         parse_mode="HTML"
     )

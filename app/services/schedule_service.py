@@ -105,16 +105,19 @@ async def check_and_send_scheduled_messages(application: Application):
             
             for chat_id in chat_ids:
                 try:
-                    if file_path and os.path.exists(file_path):
+                    sent_msg = None
+                    if file_type == 'sticker' and msg.get("sticker_id"):
+                        sent_msg = await application.bot.send_sticker(chat_id=chat_id, sticker=msg["sticker_id"], reply_markup=reply_markup)
+                    elif file_path and os.path.exists(file_path):
                         with open(file_path, 'rb') as media_file:
                             if file_type == 'photo':
-                                await application.bot.send_photo(chat_id=chat_id, photo=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
+                                sent_msg = await application.bot.send_photo(chat_id=chat_id, photo=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
                             elif file_type == 'video':
-                                await application.bot.send_video(chat_id=chat_id, video=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
+                                sent_msg = await application.bot.send_video(chat_id=chat_id, video=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
                             else:
-                                await application.bot.send_document(chat_id=chat_id, document=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
+                                sent_msg = await application.bot.send_document(chat_id=chat_id, document=media_file, caption=text, parse_mode="HTML", reply_markup=reply_markup)
                     else:
-                        await application.bot.send_message(
+                        sent_msg = await application.bot.send_message(
                             chat_id=chat_id,
                             text=text,
                             parse_mode="HTML",
@@ -122,6 +125,37 @@ async def check_and_send_scheduled_messages(application: Application):
                         )
                     results[str(chat_id)] = {"success": True}
                     success_count += 1
+                    
+                    # Log to chat history
+                    try:
+                        import time
+                        from app.services.chat_history import log_message
+                        sticker_id = msg.get("sticker_id") if file_type == 'sticker' else None
+                        media_type = file_type if file_path else None
+                        media_name = os.path.basename(file_path) if file_path else None
+                        
+                        buttons_log = []
+                        if buttons_config:
+                            for btn in buttons_config:
+                                if btn.get("text") and btn.get("url"):
+                                    buttons_log.append({"text": btn["text"], "url": btn["url"]})
+                        elif msg.get("button_text") and msg.get("button_url"):
+                            buttons_log.append({"text": msg["button_text"], "url": msg["button_url"]})
+
+                        log_message(
+                            chat_id=chat_id,
+                            message_id=sent_msg.message_id if sent_msg else int(time.time()),
+                            sender_id=application.bot.id,
+                            sender=application.bot.username or "Bot",
+                            text=text,
+                            is_bot=True,
+                            sticker_id=sticker_id,
+                            media_type=media_type,
+                            media_name=media_name,
+                            buttons=buttons_log if buttons_log else None
+                        )
+                    except Exception as he:
+                        logger.error(f"Failed to log broadcast to chat history: {he}")
                 except Exception as e:
                     logger.error(f"Failed to send scheduled message {msg.get('id')} to {chat_id}: {e}")
                     results[str(chat_id)] = {"success": False, "error": str(e)}

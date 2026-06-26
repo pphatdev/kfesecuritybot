@@ -1,8 +1,12 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 export default defineEventHandler(async (event) => {
   try {
     let message = ''
     let chatIds: string[] = []
     let fileData: any = null
+    let stickerId = ''
     let buttons: Array<{ text: string, url: string }> = []
     let buttonText = ''
     let buttonUrl = ''
@@ -20,6 +24,8 @@ export default defineEventHandler(async (event) => {
             chatIds.push(field.data.toString('utf-8'))
           } else if (field.name === 'file') {
             fileData = field
+          } else if (field.name === 'stickerId') {
+            stickerId = field.data.toString('utf-8')
           } else if (field.name === 'buttons') {
             try {
               buttons = JSON.parse(field.data.toString('utf-8'))
@@ -37,6 +43,7 @@ export default defineEventHandler(async (event) => {
       const body = await readBody(event)
       message = body.message
       chatIds = Array.isArray(body.chatIds) ? body.chatIds : [body.chatIds]
+      stickerId = body.stickerId || ''
       if (body.buttons) {
         buttons = Array.isArray(body.buttons) ? body.buttons : []
       }
@@ -44,10 +51,10 @@ export default defineEventHandler(async (event) => {
       buttonUrl = body.buttonUrl || ''
     }
 
-    if (!fileData && (!message || typeof message !== 'string')) {
+    if (!fileData && !stickerId && (!message || typeof message !== 'string')) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Message is required when no file is attached'
+        statusMessage: 'Message is required when no file or sticker is attached'
       })
     }
 
@@ -72,7 +79,10 @@ export default defineEventHandler(async (event) => {
     let method = 'sendMessage'
     let mediaType = ''
     
-    if (fileData) {
+    if (stickerId) {
+      method = 'sendSticker'
+      apiUrl = `https://api.telegram.org/bot${botToken}/${method}`
+    } else if (fileData) {
       const mime = fileData.type || ''
       if (mime.startsWith('image/')) {
         method = 'sendPhoto'
@@ -111,7 +121,17 @@ export default defineEventHandler(async (event) => {
     const requests = chatIds.map(async (chatId) => {
       let fetchOptions: any = { method: 'POST' }
 
-      if (fileData) {
+      if (stickerId) {
+        fetchOptions.headers = { 'Content-Type': 'application/json' }
+        const payload: any = {
+          chat_id: chatId,
+          sticker: stickerId
+        }
+        if (replyMarkup) {
+          payload.reply_markup = replyMarkup
+        }
+        fetchOptions.body = JSON.stringify(payload)
+      } else if (fileData) {
         const fd = new FormData()
         fd.append('chat_id', chatId)
         fd.append('caption', message)
@@ -139,6 +159,47 @@ export default defineEventHandler(async (event) => {
       const tgResult = await tgResponse.json()
       if (!tgResponse.ok || !tgResult.ok) {
         throw new Error(tgResult.description || 'Unknown Telegram API error')
+      }
+      
+      // Log to chat history
+      try {
+        const historyDbPath = path.resolve(process.cwd(), '../data/chat_history.json')
+        let historyData: Record<string, any> = {}
+        if (fs.existsSync(historyDbPath)) {
+          historyData = JSON.parse(fs.readFileSync(historyDbPath, 'utf-8'))
+        }
+        
+        const strChatId = String(chatId)
+        const chatList = historyData[strChatId] || []
+        
+        // Format time (e.g. "02:35 PM")
+        const now = new Date()
+        const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        
+        const msgButtons = inlineKeyboard.length > 0 ? inlineKeyboard.map(row => row[0]) : null
+
+        const msgEntry = {
+          message_id: tgResult.result?.message_id || Date.now(),
+          sender_id: tgResult.result?.from?.id || 0,
+          sender: tgResult.result?.from?.first_name || 'Bot',
+          text: message || (stickerId ? '[Sticker]' : fileData ? `[${mediaType}]` : ''),
+          timestamp: Math.floor(Date.now() / 1000),
+          time: timeStr,
+          is_bot: true,
+          sticker_id: stickerId || null,
+          media_type: mediaType || null,
+          media_name: fileData ? fileData.filename : null,
+          buttons: msgButtons,
+          is_deleted: false,
+          delete_reason: null
+        }
+        
+        chatList.push(msgEntry)
+        historyData[strChatId] = chatList.slice(-100) // Keep last 100
+        
+        fs.writeFileSync(historyDbPath, JSON.stringify(historyData, null, 2), 'utf-8')
+      } catch (err) {
+        console.error('Failed to log message to history:', err)
       }
       
       return { chatId, success: true }

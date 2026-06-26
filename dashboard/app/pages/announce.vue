@@ -1,12 +1,12 @@
 <template>
   <div class="mx-auto space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <!-- <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold text-(--text-heading) tracking-tight">Announcements</h1>
         <p class="text-sm text-(--text-muted) mt-1">Broadcast messages to your monitored groups, channels, and private users.</p>
       </div>
-    </div>
+    </div> -->
 
     <!-- Error / Success Banners -->
     <div v-if="error" class="bg-danger-subtle text-danger px-4 py-3 rounded-lg text-sm border border-danger/20 flex items-start gap-3 shadow-sm">
@@ -70,263 +70,499 @@
     </div>
 
     <!-- Compose Announcement (Send / Schedule Tabs) -->
-    <div v-if="activeTab === 'send' || activeTab === 'schedule'">
-      <form @submit.prevent="sendAnnouncement" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div 
+      v-if="activeTab === 'send' || activeTab === 'schedule'" 
+      :class="isMaximized ? 'fixed inset-0 z-50 bg-[#17212b] h-screen w-screen m-0 p-0' : 'h-[calc(100vh-210px)] min-h-[600px]'"
+    >
+      <form 
+        @submit.prevent="sendAnnouncement" 
+        class="flex overflow-hidden h-full bg-[#17212b] relative"
+        :class="isMaximized ? 'w-full rounded-none border-none shadow-none' : 'border border-(--border-color) rounded-2xl shadow-xl w-full'"
+      >
         
-        <!-- Left Column: Compose Message -->
-        <div class="lg:col-span-8 space-y-6">
-          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5 sm:p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
-                <IconMessageDots class="w-5 h-5 text-primary" />
-                Compose Message
-              </h2>
+        <!-- Left Pane: Chats/Recipients List -->
+        <div 
+          class="shrink-0 border-r border-[#101921] flex-col bg-[#17212b]"
+          :class="currentMobileView === 'list' ? 'flex w-full md:w-80' : 'hidden md:flex md:w-80'"
+        >
+          <div class="p-4 border-b border-[#101921] space-y-3 shrink-0">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recipients</span>
+              <span class="bg-primary-subtle text-primary text-[11px] font-bold px-2 py-0.5 rounded-full">
+                {{ selectedGroups.length }} Selected
+              </span>
+            </div>
+            <!-- Search / Filter -->
+            <div class="relative">
+              <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input 
+                type="text" 
+                v-model="searchQuery" 
+                placeholder="Search chats..." 
+                class="w-full bg-[#24303f] border border-transparent rounded-lg pl-9 pr-4 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+              />
+            </div>
+            <!-- Mention / Reply Filter Toggle -->
+            <div class="flex items-center justify-between pt-1 select-none">
+              <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 hover:text-slate-200 transition-colors">
+                <input 
+                  type="checkbox" 
+                  v-model="filterMentionsOnly" 
+                  class="rounded bg-[#24303f] border-slate-700 text-primary focus:ring-0 w-3 h-3 cursor-pointer" 
+                />
+                <span>Show only mentions/replies</span>
+              </label>
+              <span v-if="mentionsCount > 0" class="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 px-1.5 py-0.5 rounded-full">
+                {{ mentionsCount }} chats
+              </span>
+            </div>
+          </div>
+
+          <!-- Recipient List -->
+          <div class="flex-1 overflow-y-auto p-2 space-y-1 bg-[#17212b] scrollbar-thin">
+            <div v-if="pending" class="flex flex-col items-center justify-center py-12 text-slate-400">
+              <IconLoader class="w-5 h-5 animate-spin mb-2" />
+              <span class="text-xs">Loading...</span>
+            </div>
+            
+            <div v-else-if="filteredGroups.length === 0" class="flex flex-col items-center justify-center py-12 text-slate-400 px-4 text-center">
+              <IconGhost class="w-7 h-7 mb-2 opacity-50" />
+              <span class="text-xs">{{ (searchQuery || filterMentionsOnly) ? 'No chats found matching criteria.' : 'No chats tracked.' }}</span>
             </div>
 
-            <!-- Media Upload (Compact Chat UX Style) -->
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center gap-2">
-                  <span class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Attachment</span>
-                  <span class="text-[10px] text-(--text-muted) opacity-80">(Optional, Max 50MB)</span>
+            <div v-else class="space-y-0.5">
+              <label 
+                v-for="group in filteredGroups" 
+                :key="group.id"
+                class="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-[#202b36] group/item"
+                :class="{'bg-[#2b5278]/40 hover:bg-[#2b5278]/55': selectedGroups.includes(group.id.toString()) || selectedGroups.includes(group.id)}"
+              >
+                <div class="relative flex items-center justify-center">
+                  <input 
+                    type="checkbox" 
+                    :value="group.id.toString()" 
+                    v-model="selectedGroups"
+                    class="peer sr-only"
+                  />
+                  <div class="w-4 h-4 rounded border border-slate-600 peer-checked:bg-primary peer-checked:border-primary flex items-center justify-center transition-colors">
+                    <IconCheck class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" stroke-width="3" />
+                  </div>
+                </div>
+
+                <!-- Avatar Gradient sphere -->
+                <div class="w-9 h-9 rounded-full bg-gradient-to-tr text-white font-bold flex items-center justify-center shadow-sm text-xs shrink-0 select-none border border-white/5 uppercase" :class="getAvatarColorClass(group.title)">
+                  {{ group.title ? group.title.charAt(0) : 'G' }}
                 </div>
                 
-                <!-- Compact Attachment Trigger Button (Only if no file attached) -->
+                <!-- Chat Row Info -->
+                <div class="flex-1 min-w-0 text-left">
+                  <div class="flex items-baseline justify-between gap-1">
+                    <span class="text-xs font-semibold text-slate-100 truncate group-hover/item:text-blue-400 transition-colors">{{ group.title }}</span>
+                    <span v-if="group.last_message" class="text-[9px] text-slate-500 font-mono shrink-0">{{ group.last_message.time }}</span>
+                  </div>
+                  <!-- Last message preview text line -->
+                  <div class="text-[10px] text-slate-400 truncate mt-0.5" v-if="group.last_message">
+                    <span class="font-semibold text-blue-400">{{ group.last_message.sender }}:</span> {{ stripHtml(group.last_message.text) }}
+                  </div>
+                  <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                    <span class="text-[9px] font-bold tracking-wider uppercase px-1 rounded-sm" :class="group.type === 'Private Chat' ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'">
+                      {{ group.type }}
+                    </span>
+                    <span v-if="group.has_mention_or_reply" class="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 px-1 rounded-sm shrink-0" title="Bot was mentioned or replied to in this chat">
+                      💬 Mentioned
+                    </span>
+                    <span class="text-[9px] text-slate-500 truncate font-mono">{{ group.id }}</span>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+          
+          <div class="p-3 border-t border-[#101921] bg-[#17212b] shrink-0">
+             <button type="button" @click="toggleSelectAll" class="w-full py-2 text-xs font-semibold text-slate-300 hover:text-white bg-[#202b36] hover:bg-[#24303f] border border-slate-700/50 rounded-lg transition-colors cursor-pointer">
+                {{ allFilteredSelected ? 'Deselect All Shown' : 'Select All Shown' }}
+              </button>
+          </div>
+        </div>
+
+        <!-- Center Pane: Chat Workspace (The Telegram Chat Room) -->
+        <div class="flex-1 flex flex-col chat-bg-pattern relative overflow-hidden">
+          
+          <!-- Telegram Chat Header -->
+          <template v-if="selectedGroups.length > 0">
+            <div class="px-5 py-3.5 backdrop-blur-md bg-[#17212b]/85 border-b border-[#101921]/80 flex items-center justify-between shrink-0 select-none z-10">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-tr text-white font-bold flex items-center justify-center shadow-sm text-xs shrink-0 select-none border border-white/5 uppercase" :class="getAvatarColorClass(previewChatTitle)">
+                  {{ previewChatTitle ? previewChatTitle.charAt(0) : '📢' }}
+                </div>
+                <div class="text-left">
+                  <h4 class="text-xs font-semibold text-white leading-tight">
+                    {{ previewChatTitle }}
+                  </h4>
+                  <span class="text-[10px] text-blue-400 font-medium leading-none block mt-1">
+                    {{ previewChatSub }}
+                  </span>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-slate-400">
                 <button 
-                  v-if="!attachedFile"
+                  type="button" 
+                  @click="isMaximized = !isMaximized"
+                  class="p-1 hover:bg-slate-500/10 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-white"
+                  :title="isMaximized ? 'Minimize screen' : 'Maximize screen'"
+                >
+                  <IconArrowsMinimize class="w-4 h-4" v-if="isMaximized" />
+                  <IconArrowsMaximize class="w-4 h-4" v-else />
+                </button>
+                <button 
+                  type="button" 
+                  @click="showRightSidebar = !showRightSidebar"
+                  class="p-1 hover:bg-slate-500/10 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-white"
+                  title="Toggle Broadcast settings panel"
+                  :class="{'text-primary bg-primary-subtle/20 hover:text-primary': showRightSidebar}"
+                >
+                  <IconInfoCircle class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Chat Messages Area (Scrollable Message History) -->
+            <div ref="chatScrollContainer" class="flex-1 p-6 relative flex flex-col justify-start overflow-y-auto select-none scrollbar-thin">
+              
+              <!-- Chat Bubbles Area -->
+              <div class="space-y-4 mb-4 flex-1">
+                <!-- Loading Indicator -->
+                <div v-if="loadingHistory && chatHistory.length === 0" class="flex justify-center items-center py-8 text-slate-400">
+                  <IconLoader class="w-5 h-5 animate-spin mr-2" />
+                  <span class="text-xs">Loading chat history...</span>
+                </div>
+
+                <!-- Empty state for this specific chat -->
+                <div v-else-if="chatHistory.length === 0" class="text-center py-8 text-[11px] text-slate-500 italic">
+                  No recent messages recorded for this chat.
+                </div>
+
+                <!-- Message History list bubbles -->
+                <div 
+                  v-for="msg in chatHistory" 
+                  :key="msg.message_id" 
+                  class="flex items-start gap-3 w-full mx-auto text-left"
+                  :class="msg.is_bot ? 'flex-row-reverse text-right' : 'flex-row'"
+                >
+                  <!-- Avatar -->
+                  <div 
+                    class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm text-xs border animate-fade-in"
+                    :class="msg.is_bot ? 'bg-primary text-white border-primary/20' : 'bg-slate-700 text-slate-100 border-slate-600'"
+                  >
+                    {{ msg.is_bot ? '🤖' : (msg.sender ? msg.sender.charAt(0).toUpperCase() : '👤') }}
+                  </div>
+
+                  <!-- Bubble Wrapper -->
+                  <div class="flex-1 space-y-1 min-w-0" :class="{'text-right': msg.is_bot}">
+                    <div class="flex items-baseline gap-1.5" :class="{'justify-end': msg.is_bot}">
+                      <span class="text-[11px] font-semibold" :class="msg.is_bot ? 'text-blue-400' : 'text-slate-300'">
+                        {{ msg.sender }}
+                      </span>
+                      <span v-if="msg.is_bot" class="text-[8px] text-slate-500 font-medium">bot</span>
+                    </div>
+
+                    <!-- Bubble Body -->
+                    <div 
+                      class="border rounded-2xl p-3 shadow-md text-xs relative max-w-md inline-block text-left"
+                      :class="[
+                        msg.is_bot 
+                          ? 'bg-[#17212b] border-[#2b5278]/20 text-slate-100 rounded-tr-none' 
+                          : 'bg-[#182533] border-slate-700/30 text-slate-200 rounded-tl-none',
+                        msg.is_deleted ? 'opacity-60 italic bg-red-950/20 border-red-500/20' : ''
+                      ]"
+                    >
+                      <!-- Deleted Banner -->
+                      <div v-if="msg.is_deleted" class="text-red-400 flex items-center gap-1.5">
+                        <IconAlertCircle class="w-3.5 h-3.5 shrink-0" />
+                        <span>Removed: {{ msg.delete_reason || 'moderated' }}</span>
+                      </div>
+                      
+                      <div v-else>
+                        <!-- Sticker render -->
+                        <div v-if="msg.sticker_id" class="w-[120px] h-[120px] flex items-center justify-center py-1">
+                          <img :src="`/api/stickers/image?file_id=${msg.sticker_id}`" class="w-full h-full object-contain pointer-events-none" />
+                        </div>
+                        
+                        <!-- Media file attachment placeholder -->
+                        <div v-else-if="msg.media_type" class="mb-1.5 rounded-lg overflow-hidden border border-slate-700/40 p-2 bg-black/15 flex items-center gap-2 max-w-[240px]">
+                          <IconMovie class="w-4 h-4 text-primary shrink-0" v-if="msg.media_type === 'video'" />
+                          <IconPhoto class="w-4 h-4 text-primary shrink-0" v-else-if="msg.media_type === 'photo'" />
+                          <IconFileDescription class="w-4 h-4 text-primary shrink-0" v-else />
+                          <div class="flex flex-col min-w-0 text-[10px] text-left">
+                            <span class="font-semibold text-slate-300 truncate">{{ msg.media_name || 'Attachment' }}</span>
+                          </div>
+                        </div>
+
+                        <!-- Main text -->
+                        <div v-if="msg.text" v-html="msg.text" class="break-words leading-relaxed select-text pr-1"></div>
+                      </div>
+
+                      <div class="text-[8px] text-slate-500 mt-1 text-right font-mono select-none">
+                        {{ msg.time }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Bottom Composer Input Bar (The Telegram Input area) -->
+            <div class="p-4 backdrop-blur-md bg-[#17212b]/85 border-t border-[#101921]/80 shrink-0 flex items-center gap-3 select-none z-10">
+              
+              <!-- Attachment & Emoji Input Container -->
+              <div class="flex-1 bg-[#182533] border border-slate-700/20 rounded-2xl px-3 py-2 flex items-center gap-2.5 shadow-inner">
+                <!-- Attach Media trigger -->
+                <button 
                   type="button" 
                   @click="triggerFileInput"
-                  class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-500/5 hover:bg-slate-500/10 border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-body) transition-all cursor-pointer shadow-sm hover:text-primary"
+                  class="w-8 h-8 rounded-full hover:bg-slate-500/10 text-slate-400 hover:text-primary flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  title="Attach Photo/Video/Document"
                 >
-                  <IconPaperclip class="w-3.5 h-3.5 text-primary" />
-                  <span>Attach Media</span>
+                  <IconPaperclip class="w-4 h-4" />
                 </button>
-              </div>
-              
-              <input 
-                type="file" 
-                ref="fileInput" 
-                @change="handleFileChange" 
-                class="hidden" 
-                accept="image/*,video/*,application/pdf,application/zip,.doc,.docx,.xls,.xlsx"
-              />
-
-              <!-- Compact Media Preview State -->
-              <div v-if="attachedFile" class="flex items-center gap-3 bg-slate-500/5 border border-(--border-color) rounded-lg p-2.5 w-fit max-w-full">
-                <!-- Thumbnail -->
-                <div class="w-10 h-10 rounded-md bg-primary-subtle text-primary flex items-center justify-center shrink-0 overflow-hidden border border-(--border-color)">
-                  <img v-if="attachedFile.type.startsWith('image/') && previewUrl" :src="previewUrl" class="w-full h-full object-cover" />
-                  <IconMovie v-else-if="attachedFile.type.startsWith('video/')" class="w-5 h-5" />
-                  <IconFileDescription v-else class="w-5 h-5" />
-                </div>
                 
-                <!-- Info -->
-                <div class="flex flex-col min-w-0 pr-1 text-xs">
-                  <span class="font-semibold text-(--text-heading) truncate max-w-[150px] sm:max-w-[250px]">{{ attachedFile.name }}</span>
-                  <span class="text-(--text-muted) font-mono opacity-80 mt-0.5">{{ formatFileSize(attachedFile.size) }}</span>
-                </div>
-                
-                <!-- Crop Button (Only for images) -->
-                <button 
-                  v-if="attachedFile.type.startsWith('image/')"
-                  type="button" 
-                  @click="openCropModal" 
-                  class="w-6 h-6 hover:bg-primary/10 text-(--text-muted) hover:text-primary rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                  title="Crop Image"
-                >
-                  <IconScissors class="w-4 h-4" />
-                </button>
+                <input 
+                  type="file" 
+                  ref="fileInput" 
+                  @change="handleFileChange" 
+                  class="hidden" 
+                  accept="image/*,video/*,application/pdf,application/zip,.doc,.docx,.xls,.xlsx"
+                />
 
-                <!-- Remove Button -->
+                <!-- Text Composer Textarea -->
+                <textarea 
+                  v-if="composeMode === 'text'"
+                  v-model="message"
+                  rows="1"
+                  placeholder="Write a message... Supports HTML tags."
+                  class="flex-1 bg-transparent border-none text-slate-100 placeholder-slate-400 focus:ring-0 focus:outline-none m-0 text-sm max-h-80 min-h-[20px] resize-none leading-relaxed"
+                  @keydown.enter.exact.prevent="sendAnnouncement"
+                  style="field-sizing: content;"
+                ></textarea>
+
+                <!-- Sticker composer active state info -->
+                <div v-else class="flex-1 flex items-center h-8 text-xs text-slate-400">
+                  <span class="italic" v-if="selectedStickerId">Sticker selected. Ready to send.</span>
+                  <span class="italic text-slate-500" v-else>Pick a sticker from the drawer below...</span>
+                </div>
+
+                <!-- Smiley Toggle Button -->
                 <button 
                   type="button" 
-                  @click.prevent="removeFile" 
-                  class="w-6 h-6 hover:bg-danger/10 text-(--text-muted) hover:text-danger rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                  title="Remove attachment"
+                  @click="composeMode = (composeMode === 'text' ? 'sticker' : 'text')"
+                  class="w-8 h-8 rounded-full hover:bg-slate-500/10 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  :class="composeMode === 'sticker' ? 'text-primary bg-primary-subtle/20' : 'text-slate-400 hover:text-primary'"
+                  title="Toggle Stickers Panel"
                 >
-                  <IconX class="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <!-- Textarea -->
-            <div class="mt-6 border-t border-(--border-color) pt-5 space-y-2">
-              <label for="message" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Message Body</label>
-              <textarea 
-                id="message" 
-                v-model="message" 
-                rows="8"
-                placeholder="Enter your announcement here... HTML formatting (<b>, <i>, <a>, <code>) is fully supported."
-                class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-3 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-inner"
-                :required="!attachedFile"
-              ></textarea>
-              <div class="flex justify-between items-center text-xs text-(--text-muted) px-1">
-                <span>Supports Telegram HTML syntax</span>
-                <span :class="{'text-danger font-medium': message.length > 4000}">{{ message.length }} / 4000</span>
-              </div>
-            </div>
-
-            <!-- Link Buttons Option (Optional) -->
-            <div class="mt-6 border-t border-(--border-color) pt-5 space-y-4">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Add Link Buttons</span>
-                  <span class="text-[10px] text-(--text-muted) opacity-80">(Telegram Inline Keyboard)</span>
-                </div>
-                <!-- Custom Premium Toggle/Switch -->
-                <button 
-                  type="button"
-                  @click="hasButtons = !hasButtons"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                  :class="hasButtons ? 'bg-primary' : 'bg-slate-500/20'"
-                >
-                  <span 
-                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                    :class="hasButtons ? 'translate-x-5' : 'translate-x-0'"
-                  />
+                  <IconMoodSmile class="w-4 h-4" />
                 </button>
               </div>
 
-              <!-- Animated Expandable Input Fields -->
-              <Transition
-                enter-active-class="transition duration-200 ease-out"
-                enter-from-class="opacity-0 -translate-y-2"
-                enter-to-class="opacity-100 translate-y-0"
-                leave-active-class="transition duration-150 ease-in"
-                leave-from-class="opacity-100 translate-y-0"
-                leave-to-class="opacity-0 -translate-y-2"
+              <!-- Send Circular Button -->
+              <button 
+                type="submit" 
+                :disabled="sending || (composeMode === 'text' ? (!message.trim() && !attachedFile) : !selectedStickerId) || selectedGroups.length === 0 || (activeTab === 'schedule' && ((scheduleType === 'once' && !scheduleTime) || (scheduleType === 'recurring' && !cronExpression.trim())))"
+                class="w-9 h-9 rounded-full bg-primary text-white hover:bg-primary-hover flex items-center justify-center shadow-md hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all shrink-0"
+                :title="activeTab === 'schedule' ? 'Schedule Broadcast' : 'Send Broadcast'"
               >
-                <div v-if="hasButtons" class="space-y-3 bg-slate-500/5 p-4 rounded-xl border border-(--border-color) animate-in fade-in slide-in-from-top-2">
-                  <div v-for="(btn, index) in buttons" :key="index" class="flex flex-col sm:flex-row gap-3 items-end sm:items-center bg-(--bg-card) p-3 rounded-lg border border-(--border-color) shadow-sm">
-                    <div class="flex-1 w-full space-y-1">
-                      <label :for="'btnText-' + index" class="block text-[10px] font-semibold text-(--text-muted) uppercase tracking-wider">Button Label</label>
-                      <input 
-                        :id="'btnText-' + index" 
-                        type="text" 
-                        v-model="btn.text" 
-                        placeholder="e.g. Visit Website"
-                        class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-3 py-1.5 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                        required
-                      />
-                    </div>
-                    <div class="flex-1 w-full space-y-1">
-                      <label :for="'btnUrl-' + index" class="block text-[10px] font-semibold text-(--text-muted) uppercase tracking-wider">Button URL</label>
-                      <input 
-                        :id="'btnUrl-' + index" 
-                        type="url" 
-                        v-model="btn.url" 
-                        placeholder="e.g. https://example.com"
-                        class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-3 py-1.5 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                        required
-                      />
-                    </div>
-                    <button 
-                      type="button"
-                      @click="removeButton(index)"
-                      class="w-8 h-8 hover:bg-danger/10 text-(--text-muted) hover:text-danger rounded-lg flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-(--border-color) hover:border-danger/20"
-                      title="Remove Button"
-                    >
-                      <IconTrash class="w-4 h-4" />
-                    </button>
+                <IconLoader v-if="sending" class="w-4.5 h-4.5 animate-spin" />
+                <IconCalendarClock v-else-if="activeTab === 'schedule'" class="w-4.5 h-4.5" />
+                <IconSend v-else class="w-4.5 h-4.5" />
+              </button>
+            </div>
+
+            <!-- Attachment preview overlay chip in the chat middle pane -->
+            <div v-if="attachedFile" class="absolute bottom-20 left-4 bg-[#182533] border border-slate-700/50 rounded-xl p-2 flex items-center gap-2 max-w-[280px] shadow-lg animate-fade-in">
+              <div class="w-8 h-8 rounded bg-primary-subtle text-primary flex items-center justify-center overflow-hidden shrink-0 border border-slate-700">
+                <img v-if="attachedFile.type.startsWith('image/') && previewUrl" :src="previewUrl" class="w-full h-full object-cover" />
+                <IconMovie v-else-if="attachedFile.type.startsWith('video/')" class="w-4 h-4" />
+                <IconFileDescription v-else class="w-4 h-4" />
+              </div>
+              <div class="flex flex-col min-w-0 text-[10px]">
+                <span class="font-semibold text-slate-200 truncate">{{ attachedFile.name }}</span>
+                <span class="text-slate-500 font-mono">{{ formatFileSize(attachedFile.size) }}</span>
+              </div>
+              <button type="button" @click="removeFile" class="w-4.5 h-4.5 rounded-full bg-black/25 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer">
+                <IconX class="w-3 h-3" />
+              </button>
+            </div>
+
+            <!-- Sticker Keyboard Popover (Drawer inside central workspace) -->
+            <Transition
+              enter-active-class="transition duration-200 ease-out transform"
+              enter-from-class="translate-y-full"
+              enter-to-class="translate-y-0"
+              leave-active-class="transition duration-150 ease-in transform"
+              leave-from-class="translate-y-0"
+              leave-to-class="translate-y-full"
+            >
+              <div v-if="composeMode === 'sticker'" class="absolute bottom-16 inset-x-0 bg-[#17212b] border-t border-[#101921] h-[340px] flex flex-col z-20 shadow-2xl animate-in">
+                <div class="p-3 border-b border-[#101921] flex gap-2 shrink-0 select-none">
+                  <!-- Mini search for sticker sets -->
+                  <div class="relative flex-1">
+                    <IconSearch class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input 
+                      type="text" 
+                      v-model="searchPackName" 
+                      placeholder="Search sticker packs..." 
+                      class="w-full bg-[#24303f] border border-transparent rounded-lg pl-8 pr-4 py-1 text-[11px] text-slate-100 placeholder-slate-400 focus:outline-none"
+                      @keyup.enter="loadStickerPack(searchPackName)"
+                    />
                   </div>
                   <button 
                     type="button" 
-                    @click="addButton"
-                    class="flex items-center gap-1.5 px-3 py-2 bg-primary-subtle hover:bg-primary/20 text-primary border border-primary/10 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                    @click="loadStickerPack(searchPackName)"
+                    :disabled="loadingStickers || !searchPackName.trim()"
+                    class="px-2.5 py-1 bg-primary text-white rounded-lg text-[10px] font-semibold disabled:opacity-50 cursor-pointer"
                   >
-                    <IconPlus class="w-3.5 h-3.5" />
-                    <span>Add Button</span>
+                    <IconLoader v-if="loadingStickers" class="w-3.5 h-3.5 animate-spin" />
+                    <span v-else>Load</span>
                   </button>
                 </div>
-              </Transition>
+
+                <!-- Popular Packs selection chips -->
+                <div class="px-3 py-1.5 border-b border-[#101921]/50 bg-[#17212b] flex items-center gap-1.5 overflow-x-auto shrink-0 select-none scrollbar-none">
+                  <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider shrink-0">Popular:</span>
+                  <button 
+                    v-for="pack in ['Animals', 'tg_placeholders', 'CherryHot', 'MochaBull', 'EggDog', 'Diggy']" 
+                    :key="pack"
+                    type="button"
+                    @click="searchPackName = pack; loadStickerPack(pack)"
+                    class="text-[9px] bg-[#202b36] hover:bg-primary/20 hover:text-primary text-slate-300 border border-slate-700/40 rounded-full px-2.5 py-0.5 transition-all cursor-pointer shrink-0"
+                  >
+                    {{ pack }}
+                  </button>
+                </div>
+
+                <!-- Loaded Stickers Grid list -->
+                <div class="flex-1 overflow-y-auto p-3 bg-[#0e1621] scrollbar-thin select-none">
+                  <div v-if="stickerError" class="bg-danger-subtle text-danger px-3 py-2 rounded-lg text-[11px] border border-danger/10 text-left">
+                    {{ stickerError }}
+                  </div>
+                  <div v-else-if="loadedStickers.length === 0" class="flex flex-col items-center justify-center h-full text-slate-500 py-12">
+                    <IconMoodSmile class="w-8 h-8 opacity-40 mb-1.5" />
+                    <span class="text-[11px]">Select a popular pack or type a name to load.</span>
+                  </div>
+                  <div v-else class="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-2">
+                    <div 
+                      v-for="stk in loadedStickers" 
+                      :key="stk.file_id"
+                      @click="selectSticker(stk)"
+                      class="group relative flex items-center justify-center p-1.5 rounded-lg bg-[#182533] hover:bg-[#202b36] border border-slate-700/50 cursor-pointer transition-all aspect-square overflow-hidden hover:scale-105"
+                      :class="{'border-2 border-primary ring-2 ring-primary/20': selectedStickerId === stk.file_id}"
+                    >
+                      <div v-if="stk.is_animated" class="w-full h-full flex items-center justify-center">
+                        <lottie-player :src="`/api/stickers/image?file_id=${stk.file_id}`" autoplay loop background="transparent" style="width: 100%; height: 100%;"></lottie-player>
+                      </div>
+                      <video v-else-if="stk.is_video" :src="`/api/stickers/image?file_id=${stk.file_id}`" autoplay loop muted playsinline class="w-full h-full object-contain"></video>
+                      <img v-else :src="`/api/stickers/image?file_id=${stk.thumbnail?.file_id || stk.thumb?.file_id || stk.file_id}`" class="w-full h-full object-contain pointer-events-none" loading="lazy" />
+                      <div v-if="selectedStickerId === stk.file_id" class="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-white flex items-center justify-center shadow">
+                        <IconCheck class="w-2 h-2" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </template>
+
+          <div v-else class="flex-1 flex flex-col items-center justify-center p-8 text-center select-none bg-[#0e1621] h-full animate-fade-in">
+            <div class="w-16 h-16 rounded-full bg-slate-500/5 flex items-center justify-center mb-4 border border-slate-700/10">
+              <IconMessageDots class="w-8 h-8 text-primary opacity-60" />
+            </div>
+            <h3 class="text-sm font-bold text-slate-300">Select a recipient to start messaging</h3>
+            <p class="text-[11px] text-slate-500 mt-1.5 max-w-xs leading-normal">Choose one or more groups, channels, or private chats from the list on the left to start composing and broadcasting your announcements.</p>
+          </div>
+
+        </div>
+
+        <!-- Right Pane: Broadcast Tools Drawer (Telegram Chat Info Pane style) -->
+          <Transition
+          enter-active-class="transition duration-200 ease-out transform"
+          enter-from-class="translate-x-full"
+          enter-to-class="translate-x-0"
+          leave-active-class="transition duration-150 ease-in transform"
+          leave-from-class="translate-x-0"
+          leave-to-class="translate-x-full"
+        >
+          <div v-show="showRightSidebar" class="w-80 shrink-0 border-l border-[#101921] flex flex-col bg-[#17212b] overflow-y-auto p-4 space-y-5 select-none scrollbar-thin">
+          <div class="flex items-center justify-between pb-3 border-b border-[#101921] shrink-0">
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Broadcast Settings</span>
+              <button type="button" @click="showRightSidebar = false" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+                <IconX class="w-4 h-4" />
+              </button>
             </div>
 
-            <!-- DateTime / Cron Picker (Only in Schedule Tab) -->
-            <div v-if="activeTab === 'schedule'" class="mt-6 border-t border-(--border-color) pt-5 space-y-4">
-              <!-- Schedule Type Toggle -->
-              <div class="flex items-center gap-4 bg-slate-500/5 px-4 py-2 rounded-lg border border-(--border-color) w-fit">
-                <label class="flex items-center gap-2 text-xs font-bold text-(--text-body) uppercase tracking-wider cursor-pointer">
-                  <input type="radio" v-model="scheduleType" value="once" class="text-primary focus:ring-primary focus:ring-offset-0 bg-transparent border-(--border-color)" />
-                  One-time
-                </label>
-                <label class="flex items-center gap-2 text-xs font-bold text-(--text-body) uppercase tracking-wider cursor-pointer">
-                  <input type="radio" v-model="scheduleType" value="recurring" class="text-primary focus:ring-primary focus:ring-offset-0 bg-transparent border-(--border-color)" />
-                  Recurring (Cron)
-                </label>
+            <!-- Scheduler settings section -->
+            <div class="space-y-2 bg-[#202b36] p-3 rounded-xl border border-slate-700/30">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Schedule Delivery</span>
+                <!-- Badge for schedule type -->
+                <span class="text-[9px] bg-primary/20 text-primary font-bold px-1.5 py-0.5 rounded uppercase font-mono">
+                  {{ activeTab === 'schedule' ? 'Scheduled' : 'Instant' }}
+                </span>
               </div>
+              
+              <div v-if="activeTab === 'schedule'" class="space-y-3 pt-2">
+                <!-- One-time vs Recurring toggle -->
+                <div class="flex gap-2 bg-[#17212b] p-1 rounded-lg border border-slate-800">
+                  <button 
+                    type="button" 
+                    @click="scheduleType = 'once'"
+                    class="flex-1 py-1 rounded text-[10px] font-bold transition-all cursor-pointer"
+                    :class="scheduleType === 'once' ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'"
+                  >
+                    Once
+                  </button>
+                  <button 
+                    type="button" 
+                    @click="scheduleType = 'recurring'"
+                    class="flex-1 py-1 rounded text-[10px] font-bold transition-all cursor-pointer"
+                    :class="scheduleType === 'recurring' ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'"
+                  >
+                    Recurring
+                  </button>
+                </div>
 
-              <!-- One-time Datepicker -->
-              <div v-if="scheduleType === 'once'" class="space-y-2">
-                <label class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Scheduled Time</label>
-                
-                <div class="relative w-full" ref="pickerContainer">
-                  <!-- Trigger Button -->
+                <!-- One-time inputs -->
+                <div v-if="scheduleType === 'once'" class="space-y-1.5 relative" ref="pickerContainer">
+                  <label class="block text-[9px] font-bold text-slate-400 uppercase">Send Time</label>
                   <button 
                     type="button" 
                     @click="toggleDropdown"
-                    class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-2.5 text-sm text-(--text-body) text-left focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all flex items-center justify-between shadow-inner cursor-pointer"
+                    class="w-full bg-[#17212b] border border-slate-700/50 rounded-lg px-3 py-2 text-xs text-slate-100 flex items-center justify-between cursor-pointer"
                   >
-                    <div class="flex items-center gap-2">
-                      <IconCalendarClock class="w-4 h-4 text-primary" />
-                      <span :class="{'text-(--text-muted)': !scheduleTime}">
-                        {{ formattedScheduleTime || 'Select date & time' }}
-                      </span>
-                    </div>
-                    <IconChevronDown class="w-4 h-4 text-(--text-muted) transition-transform duration-200" :class="{'rotate-180': isDropdownOpen}" />
+                    <span class="truncate">{{ formattedScheduleTime || 'Select date & time' }}</span>
+                    <IconChevronDown class="w-3.5 h-3.5 text-slate-400" />
                   </button>
                   
-                  <!-- Popover Dropdown overlay panel -->
-                  <div 
-                    v-if="isDropdownOpen" 
-                    class="absolute left-0 mt-2 z-30 bg-(--bg-card) border border-(--border-color) rounded-2xl shadow-(--shadow-lg) p-4 w-[340px] select-none text-left animate-fade-in"
-                  >
-                    <!-- Month & Year Selector Header -->
-                    <div class="flex items-center justify-between pb-3 border-b border-(--border-color) mb-3">
-                      <button 
-                        type="button" 
-                        @click="prevMonth" 
-                        class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
-                      >
-                        <IconChevronLeft class="w-4 h-4" />
-                      </button>
-                      <span class="text-sm font-semibold text-(--text-heading)">
-                        {{ monthNames[currentMonth] }} {{ currentYear }}
-                      </span>
-                      <button 
-                        type="button" 
-                        @click="nextMonth" 
-                        class="p-1 hover:bg-slate-500/10 rounded-lg text-(--text-muted) hover:text-(--text-heading) transition-colors cursor-pointer"
-                      >
-                        <IconChevronRight class="w-4 h-4" />
-                      </button>
+                  <!-- Datepicker dropdown popover -->
+                  <div v-if="isDropdownOpen" class="absolute right-0 bottom-full mb-2 z-30 bg-[#17212b] border border-[#101921] rounded-xl p-3 w-[260px] shadow-2xl animate-fade-in text-[11px]">
+                    <div class="flex items-center justify-between pb-2 border-b border-[#101921] mb-2">
+                      <button type="button" @click="prevMonth" class="text-slate-400 hover:text-white cursor-pointer"><IconChevronLeft class="w-3.5 h-3.5" /></button>
+                      <span class="font-bold text-slate-200">{{ monthNames[currentMonth] }} {{ currentYear }}</span>
+                      <button type="button" @click="nextMonth" class="text-slate-400 hover:text-white cursor-pointer"><IconChevronRight class="w-3.5 h-3.5" /></button>
                     </div>
-                    
-                    <!-- Week Days Headers -->
-                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-2">
-                      <span>Su</span>
-                      <span>Mo</span>
-                      <span>Tu</span>
-                      <span>We</span>
-                      <span>Th</span>
-                      <span>Fr</span>
-                      <span>Sa</span>
+                    <div class="grid grid-cols-7 gap-1 text-center font-bold text-slate-500 mb-1">
+                      <div v-for="d in ['Su','Mo','Tu','We','Th','Fr','Sa']" :key="d" class="text-[9px]">{{ d }}</div>
                     </div>
-                    
-                    <!-- Calendar Day Cells -->
                     <div class="grid grid-cols-7 gap-1 text-center">
-                      <div v-for="(cell, idx) in calendarCells" :key="idx" class="aspect-square flex items-center justify-center">
-                        <span v-if="cell.type === 'empty'" class="w-8 h-8"></span>
-                        <button
+                      <div v-for="(cell, cIdx) in calendarCells" :key="cIdx" class="aspect-square flex items-center justify-center">
+                        <button 
+                          v-if="cell.type === 'day'"
                           type="button"
                           @click="selectDay(cell)"
                           :disabled="cell.disabled"
-                          class="w-8 h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer"
+                          class="w-full h-full rounded text-[10px] font-semibold transition-all cursor-pointer"
                           :class="[
-                            isSameDay(cell.date, selectedDate)
-                              ? 'bg-primary text-white shadow-sm font-bold'
-                              : cell.disabled
-                                ? 'opacity-25 cursor-not-allowed text-(--text-muted)'
-                                : 'text-(--text-body) hover:bg-slate-500/10 hover:text-(--text-heading)'
+                            cell.disabled ? 'text-slate-600 cursor-not-allowed' : 'text-slate-200 hover:bg-[#2b5278]/30',
+                            selectedDate && isSameDay(cell.date, selectedDate) ? 'bg-primary text-white font-bold' : ''
                           ]"
                         >
                           {{ cell.day }}
@@ -334,233 +570,140 @@
                       </div>
                     </div>
                     
-                    <!-- Time Picker Section -->
-                    <div class="flex items-center justify-between border-t border-(--border-color) pt-3 mt-3">
-                      <span class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">Time</span>
-                      <div class="flex items-center gap-1.5 bg-slate-500/5 px-2.5 py-1 rounded-xl border border-(--border-color)">
-                        <!-- Hour Selector Dropdown -->
-                        <select 
-                          v-model="selectedHour" 
-                          @change="updateScheduleTime" 
-                          class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
-                        >
-                          <option v-for="h in 12" :key="h" :value="h" class="bg-(--bg-card) text-(--text-heading)">{{ String(h).padStart(2, '0') }}</option>
+                    <!-- Hours/Minutes selector -->
+                    <div class="flex items-center justify-between pt-2 border-t border-[#101921] mt-2 gap-1 select-none">
+                      <div class="flex items-center gap-1 bg-[#202b36] px-1.5 py-0.5 rounded border border-slate-700/30">
+                        <select v-model="selectedHour" @change="updateScheduleTime" class="bg-transparent border-none text-[10px] text-slate-200 font-semibold focus:ring-0 p-0 outline-none cursor-pointer">
+                          <option v-for="h in 12" :key="h" :value="h" class="bg-[#17212b] text-slate-200">{{ h }}</option>
                         </select>
-                        
-                        <span class="text-(--text-muted) font-semibold">:</span>
-                        
-                        <!-- Minute Selector Dropdown -->
-                        <select 
-                          v-model="selectedMinute" 
-                          @change="updateScheduleTime" 
-                          class="bg-transparent border-none text-sm text-(--text-heading) font-semibold focus:ring-0 p-0 text-center w-8 cursor-pointer appearance-none outline-none font-mono"
-                        >
-                          <option v-for="m in 60" :key="m-1" :value="m-1" class="bg-(--bg-card) text-(--text-heading)">{{ String(m-1).padStart(2, '0') }}</option>
+                        <span class="text-slate-500 font-bold">:</span>
+                        <select v-model="selectedMinute" @change="updateScheduleTime" class="bg-transparent border-none text-[10px] text-slate-200 font-semibold focus:ring-0 p-0 outline-none cursor-pointer">
+                          <option v-for="m in 60" :key="m-1" :value="m-1" class="bg-[#17212b] text-slate-200">{{ String(m-1).padStart(2, '0') }}</option>
                         </select>
-                        
-                        <!-- AM/PM Toggle Segment -->
-                        <div class="flex border-l border-(--border-color) pl-2 ml-1 gap-1">
-                          <button 
-                            type="button" 
-                            @click="selectedAmPm = 'AM'; updateScheduleTime()"
-                            class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                            :class="selectedAmPm === 'AM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
-                          >
-                            AM
-                          </button>
-                          <button 
-                            type="button" 
-                            @click="selectedAmPm = 'PM'; updateScheduleTime()"
-                            class="px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                            :class="selectedAmPm === 'PM' ? 'bg-primary text-white shadow-sm' : 'text-(--text-muted) hover:text-(--text-heading)'"
-                          >
-                            PM
-                          </button>
+                        <div class="flex border-l border-slate-700/50 pl-1.5 ml-1 gap-1">
+                          <button type="button" @click="selectedAmPm = 'AM'; updateScheduleTime()" class="px-1 py-0.2 rounded text-[8px] font-bold" :class="selectedAmPm === 'AM' ? 'bg-primary text-white' : 'text-slate-500'">AM</button>
+                          <button type="button" @click="selectedAmPm = 'PM'; updateScheduleTime()" class="px-1 py-0.2 rounded text-[8px] font-bold" :class="selectedAmPm === 'PM' ? 'bg-primary text-white' : 'text-slate-500'">PM</button>
                         </div>
                       </div>
-                    </div>
-                    
-                    <!-- Dropdown Action Footer -->
-                    <div class="flex justify-end mt-3 pt-2 border-t border-(--border-color)">
-                      <button 
-                        type="button" 
-                        @click="isDropdownOpen = false" 
-                        class="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer"
-                      >
-                        Apply
-                      </button>
+                      <button type="button" @click="isDropdownOpen = false" class="px-2 py-1 bg-primary text-white rounded text-[9px] font-bold cursor-pointer">Apply</button>
                     </div>
                   </div>
                 </div>
-                <p class="text-xs text-(--text-muted)">The announcement will be queued and sent automatically at this local time.</p>
-              </div>
 
-              <!-- Recurring Cron Expression Input -->
-              <div v-else class="space-y-3">
-                <div class="space-y-2">
-                  <label for="cron" class="block text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Cron Expression</label>
+                <!-- Recurring Cron inputs -->
+                <div v-else class="space-y-2">
+                  <label for="cron" class="block text-[9px] font-bold text-slate-400 uppercase">Cron Expression</label>
                   <input 
                     id="cron" 
                     type="text" 
                     v-model="cronExpression" 
-                    placeholder="e.g. */30 * * * * or 0 9 * * 1"
-                    class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg px-4 py-2.5 text-sm text-(--text-body) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-inner"
+                    placeholder="e.g. */30 * * * *"
+                    class="w-full bg-[#17212b] border border-slate-700/50 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none"
                     required
                   />
-                  <!-- Active Cron Description Badge -->
-                  <div v-if="cronExpression.trim()" class="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary-subtle/50 px-2.5 py-1.5 rounded-lg border border-primary/20 w-fit">
-                    <IconCheck class="w-3.5 h-3.5 shrink-0" />
-                    <span>Active Schedule: {{ activeCronDescription }}</span>
-                  </div>
-                </div>
-
-                <!-- Cron Templates -->
-                <div class="bg-slate-500/5 border border-(--border-color) rounded-lg p-3 space-y-2">
-                  <span class="block text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">Quick-Select Cron Templates</span>
-                  <div class="flex flex-wrap gap-1.5">
+                  <!-- Cron Templates -->
+                  <div class="flex flex-wrap gap-1">
                     <button 
                       v-for="tpl in cronTemplates" 
                       :key="tpl.label"
                       type="button" 
                       @click="cronExpression = tpl.expr"
-                      class="px-2.5 py-1 border rounded text-[11px] font-semibold transition-all cursor-pointer shadow-sm"
-                      :class="cronExpression.trim() === tpl.expr ? 'bg-primary border-primary text-white hover:bg-primary-hover hover:text-white shadow-md' : 'bg-(--bg-card) border-(--border-color) text-(--text-body) hover:bg-slate-500/10 hover:text-(--text-heading)'"
-                      :title="tpl.expr"
+                      class="px-2 py-0.5 border rounded-full text-[9px] font-semibold transition-all cursor-pointer"
+                      :class="cronExpression.trim() === tpl.expr ? 'bg-primary border-primary text-white' : 'bg-[#17212b] border-slate-700/30 text-slate-400 hover:text-slate-200'"
                     >
                       {{ tpl.label }}
                     </button>
                   </div>
                 </div>
-
-                <div class="text-xs text-(--text-muted) space-y-1 mt-1 leading-relaxed">
-                  <p>Format: <code>minute hour day-of-month month day-of-week</code> (5 space-separated values).</p>
-                  <p>Examples: <code>0 9 * * 1</code> (Every Monday at 9:00 AM) or <code>0 0 * * *</code> (Daily at midnight).</p>
-                </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Column: Select Recipients & Actions -->
-        <div class="lg:col-span-4 space-y-6">
-          
-          <!-- Templates Card -->
-          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
-            <h2 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-              Announcement Templates
-            </h2>
-            <div class="flex flex-col gap-2">
-              <button 
-                v-for="tpl in announcementTemplates" 
-                :key="tpl.name"
-                type="button" 
-                @click="applyTemplate(tpl.text)"
-                class="w-full px-3 py-2 bg-slate-500/5 hover:bg-slate-500/10 border border-(--border-color) rounded-lg text-xs font-semibold text-(--text-body) hover:text-(--text-heading) transition-all flex items-center gap-2 cursor-pointer shadow-sm"
-              >
-                <component :is="tpl.icon" class="w-4 h-4 text-primary shrink-0" />
-                {{ tpl.name }}
-              </button>
-            </div>
-          </div>
-
-          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) flex flex-col h-[500px]">
-            <div class="p-5 border-b border-(--border-color) shrink-0">
-              <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
-                  <IconUsers class="w-5 h-5 text-primary" />
-                  Recipients
-                </h2>
-                <span class="bg-primary-subtle text-primary text-xs font-bold px-2 py-0.5 rounded-full">
-                  {{ selectedGroups.length }} Selected
-                </span>
-              </div>
-
-              <!-- Search / Filter -->
-              <div class="relative">
-                <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
-                <input 
-                  type="text" 
-                  v-model="searchQuery" 
-                  placeholder="Search recipients..." 
-                  class="w-full bg-(--bg-layout) border border-(--border-color) rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                />
+              <div v-else class="text-[10px] text-slate-400 pt-1 leading-normal">
+                Message will be broadcasted immediately to all checked recipients.
               </div>
             </div>
 
-            <!-- Recipient List -->
-            <div class="flex-1 overflow-y-auto p-2">
-              <div v-if="pending" class="flex flex-col items-center justify-center h-full text-(--text-muted)">
-                <IconLoader class="w-6 h-6 animate-spin mb-2" />
-                <span class="text-sm">Loading...</span>
-              </div>
-              
-              <div v-else-if="filteredGroups.length === 0" class="flex flex-col items-center justify-center h-full text-(--text-muted) px-4 text-center">
-                <IconGhost class="w-8 h-8 mb-2 opacity-50" />
-                <span class="text-sm">{{ searchQuery ? 'No recipients found.' : 'No recipients tracked yet.' }}</span>
-              </div>
-
-              <div v-else class="space-y-1">
-                <label 
-                  v-for="group in filteredGroups" 
-                  :key="group.id"
-                  class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-(--bg-layout) group/item"
-                  :class="{'bg-primary-subtle/30': selectedGroups.includes(group.id)}"
+            <!-- Inline Buttons builder section -->
+            <div v-if="composeMode === 'text'" class="space-y-2.5 bg-[#202b36] p-3 rounded-xl border border-slate-700/30">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Keyboard Buttons</span>
+                <!-- Switch -->
+                <button 
+                  type="button"
+                  @click="hasButtons = !hasButtons"
+                  class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                  :class="hasButtons ? 'bg-primary' : 'bg-slate-700'"
                 >
-                  <div class="relative flex items-center justify-center">
-                    <input 
-                      type="checkbox" 
-                      :value="group.id" 
-                      v-model="selectedGroups"
-                      class="peer sr-only"
-                    />
-                    <div class="w-5 h-5 rounded border-2 border-(--border-color) peer-checked:bg-primary peer-checked:border-primary flex items-center justify-center transition-colors">
-                      <IconCheck class="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" stroke-width="3" />
-                    </div>
+                  <span class="pointer-events-none inline-block h-3.8 w-3.8 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="hasButtons ? 'translate-x-4' : 'translate-x-0'" />
+                </button>
+              </div>
+
+              <div v-if="hasButtons" class="space-y-2 pt-1.5">
+                <div v-for="(btn, index) in buttons" :key="index" class="flex flex-col gap-1.5 bg-[#17212b] p-2 rounded-lg border border-slate-800">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[9px] text-slate-500 font-mono">#{{ index + 1 }}</span>
+                    <button type="button" @click="buttons.splice(index, 1)" class="text-danger hover:text-danger/80 cursor-pointer">
+                      <IconTrash class="w-3 h-3" />
+                    </button>
                   </div>
-                  
-                  <div class="flex flex-col overflow-hidden flex-1">
-                    <span class="text-sm font-medium text-(--text-heading) truncate group-hover/item:text-primary transition-colors">{{ group.title }}</span>
-                    <div class="flex items-center gap-2 mt-0.5">
-                      <span class="text-[10px] font-bold tracking-widest uppercase" :class="group.type === 'Private Chat' ? 'text-blue-500' : 'text-emerald-500'">
-                        {{ group.type }}
-                      </span>
-                      <span class="text-xs text-(--text-muted) truncate font-mono opacity-60">{{ group.id }}</span>
-                    </div>
-                  </div>
-                </label>
+                  <input 
+                    type="text" 
+                    v-model="btn.text" 
+                    placeholder="Button Label"
+                    class="w-full bg-[#24303f] border border-transparent rounded px-2 py-1 text-[11px] text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary"
+                    required
+                  />
+                  <input 
+                    type="url" 
+                    v-model="btn.url" 
+                    placeholder="URL (https://...)"
+                    class="w-full bg-[#24303f] border border-transparent rounded px-2 py-1 text-[11px] text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary"
+                    required
+                  />
+                </div>
+                <button 
+                  type="button" 
+                  @click="addButton"
+                  class="w-full py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/10 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <IconPlus class="w-3 h-3" />
+                  Add Button
+                </button>
               </div>
             </div>
-            
-            <div class="p-4 border-t border-(--border-color) bg-(--bg-layout)/50 shrink-0">
-               <button type="button" @click="toggleSelectAll" class="w-full py-2 text-sm font-semibold text-(--text-heading) hover:bg-(--bg-layout) border border-(--border-color) rounded-lg transition-colors">
-                  {{ allFilteredSelected ? 'Deselect All Shown' : 'Select All Shown' }}
+
+            <!-- Templates Section -->
+            <div class="space-y-2.5 bg-[#202b36] p-3 rounded-xl border border-slate-700/30 flex-1 flex flex-col min-h-[220px]">
+              <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider shrink-0">Announcement Templates</span>
+              <div class="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin pr-1 text-left">
+                <button 
+                  v-for="tpl in announcementTemplates" 
+                  :key="tpl.name"
+                  type="button" 
+                  @click="applyTemplate(tpl.text)"
+                  class="w-full text-left p-2 bg-[#17212b] hover:bg-[#24303f] border border-slate-800 rounded-lg text-[11px] font-medium text-slate-300 hover:text-white transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <component :is="tpl.icon" class="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span class="truncate">{{ tpl.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submit Broadcast button (Double confirmation action inside setting drawer) -->
+            <div class="pt-2 border-t border-[#101921] shrink-0">
+               <button 
+                  type="submit" 
+                  :disabled="sending || (composeMode === 'text' ? (!message.trim() && !attachedFile) : !selectedStickerId) || selectedGroups.length === 0 || (activeTab === 'schedule' && ((scheduleType === 'once' && !scheduleTime) || (scheduleType === 'recurring' && !cronExpression.trim())))"
+                  class="w-full py-3 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-hover focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg disabled:shadow-none cursor-pointer"
+                >
+                  <IconSend v-if="!sending && activeTab === 'send'" class="w-4 h-4" />
+                  <IconCalendarClock v-else-if="!sending && activeTab === 'schedule'" class="w-4 h-4" />
+                  <IconLoader v-else class="w-4 h-4 animate-spin" />
+                  {{ sending ? (activeTab === 'schedule' ? 'Scheduling...' : 'Broadcasting...') : (activeTab === 'schedule' ? 'Schedule Broadcast' : 'Send Broadcast') }}
                 </button>
             </div>
+            
           </div>
+        </Transition>
 
-          <!-- Action Card -->
-          <div class="bg-(--bg-card) border border-(--border-color) rounded-xl shadow-(--shadow-sm) p-5">
-             <button 
-                type="submit" 
-                :disabled="sending || (!message.trim() && !attachedFile) || selectedGroups.length === 0 || (activeTab === 'schedule' && ((scheduleType === 'once' && !scheduleTime) || (scheduleType === 'recurring' && !cronExpression.trim())))"
-                class="w-full py-3.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-hover focus:ring-4 focus:ring-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
-              >
-                <IconSend v-if="!sending && activeTab === 'send'" class="w-5 h-5" />
-                <IconCalendarClock v-else-if="!sending && activeTab === 'schedule'" class="w-5 h-5" />
-                <IconLoader v-else class="w-5 h-5 animate-spin" />
-                {{ sending ? (activeTab === 'schedule' ? 'Scheduling...' : 'Broadcasting...') : (activeTab === 'schedule' ? 'Schedule Broadcast' : 'Send Broadcast') }}
-              </button>
-              <p class="text-[11px] text-center text-(--text-muted) mt-3 leading-relaxed">
-                <span v-if="activeTab === 'schedule'">
-                  Message will be queued to send to <b>{{ selectedGroups.length }}</b> recipients at the scheduled time.
-                </span>
-                <span v-else>
-                  Message will be immediately dispatched to <b>{{ selectedGroups.length }}</b> recipients. This action cannot be undone.
-                </span>
-              </p>
-          </div>
-
-        </div>
       </form>
     </div>
 
@@ -609,7 +752,13 @@
             <tr v-for="schedule in sortedSchedules" :key="schedule.id" class="hover:bg-(--bg-layout)/50 transition-colors">
               <td class="py-3.5 px-4 font-normal text-(--text-body) max-w-xs sm:max-w-md truncate">
                 <div class="flex flex-col gap-1">
-                  <span class="font-medium text-(--text-heading)" :title="schedule.message">{{ truncateText(schedule.message, 60) }}</span>
+                  <div v-if="schedule.file_type === 'sticker'" class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded bg-slate-500/5 border border-(--border-color) p-0.5 flex items-center justify-center shrink-0">
+                      <img :src="`/api/stickers/image?file_id=${schedule.sticker_thumb_id || schedule.sticker_id}`" class="w-full h-full object-contain" />
+                    </div>
+                    <span class="text-xs text-(--text-muted)">Sticker Broadcast</span>
+                  </div>
+                  <span v-else class="font-medium text-(--text-heading)" :title="schedule.message">{{ truncateText(schedule.message, 60) }}</span>
                   <!-- Display Buttons configured -->
                   <div v-if="schedule.buttons && schedule.buttons.length > 0" class="flex flex-wrap gap-1 mt-1">
                     <span v-for="(btn, bIdx) in schedule.buttons" :key="bIdx" class="text-[10px] text-(--text-muted) inline-flex items-center gap-0.5 bg-slate-500/5 px-1 py-0.5 rounded border border-(--border-color)" :title="btn.url">
@@ -816,11 +965,34 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Custom Toast Notification -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out transform"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="toast.show" class="fixed top-5 right-5 z-[9999] max-w-sm w-full bg-slate-900/95 border border-slate-700/50 backdrop-blur-md rounded-xl p-4 shadow-2xl flex items-start gap-3 select-none pointer-events-auto">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" :class="toast.type === 'success' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
+          <IconCheck class="w-4 h-4" v-if="toast.type === 'success'" />
+          <IconAlertCircle class="w-4 h-4" v-else />
+        </div>
+        <div class="flex-1 text-xs font-semibold text-slate-100 pt-1.5 leading-normal text-left">
+          {{ toast.message }}
+        </div>
+        <button type="button" @click="toast.show = false" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-500/10 cursor-pointer">
+          <IconX class="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { 
   IconAlertCircle, 
@@ -850,14 +1022,188 @@ import {
   IconCopy,
   IconScissors,
   IconLink,
-  IconPlus
+  IconPlus,
+  IconMoodSmile,
+  IconArrowsMaximize,
+  IconArrowsMinimize
 } from '@tabler/icons-vue'
 
 const message = ref('')
 const selectedGroups = ref([])
 const searchQuery = ref('')
+const filterMentionsOnly = ref(false)
 const hasButtons = ref(false)
 const buttons = ref([])
+const showRightSidebar = ref(true)
+const isMaximized = ref(false)
+const currentMobileView = ref('list')
+
+const toast = ref({ show: false, message: '', type: 'success' })
+let toastTimeout = null
+
+const triggerToast = (msg, type = 'success') => {
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toast.value = { show: true, message: msg, type }
+  toastTimeout = setTimeout(() => {
+    toast.value.show = false
+  }, 4000)
+}
+
+const chatHistory = ref([])
+const loadingHistory = ref(false)
+const chatScrollContainer = ref(null)
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatScrollContainer.value) {
+      chatScrollContainer.value.scrollTop = chatScrollContainer.value.scrollHeight
+    }
+  })
+}
+
+const activeChatId = computed(() => {
+  return selectedGroups.value.length > 0 ? selectedGroups.value[0].toString() : null
+})
+
+const fetchChatHistory = async () => {
+  const chatId = activeChatId.value
+  if (!chatId) {
+    chatHistory.value = []
+    return
+  }
+  loadingHistory.value = true
+  try {
+    const data = await $fetch('/api/chats/history', {
+      query: { chat_id: chatId }
+    })
+    chatHistory.value = data.history || []
+    scrollToBottom()
+  } catch (err) {
+    console.error('Failed to fetch chat history:', err)
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+watch(activeChatId, (newId) => {
+  fetchChatHistory()
+  if (newId) {
+    currentMobileView.value = 'chat'
+  } else {
+    currentMobileView.value = 'list'
+  }
+})
+
+watch(chatHistory, () => {
+  scrollToBottom()
+}, { deep: true })
+
+const formattedCurrentTime = ref('12:00 PM')
+
+onMounted(() => {
+  const updateClock = () => {
+    formattedCurrentTime.value = new Date().toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+  updateClock()
+  const interval = setInterval(updateClock, 60000)
+  
+  fetchChatHistory()
+  const historyInterval = setInterval(() => {
+    if (activeChatId.value) {
+      fetchChatHistory()
+    }
+  }, 5000)
+  
+  onBeforeUnmount(() => {
+    clearInterval(interval)
+    clearInterval(historyInterval)
+  })
+})
+
+useHead({
+  script: [
+    {
+      src: 'https://unpkg.com/@lottiefiles/lottie-player@1.7.1/dist/lottie-player.js',
+      defer: true
+    }
+  ]
+})
+
+const composeMode = ref('text')
+const searchPackName = ref('')
+const loadedStickers = ref([])
+const loadingStickers = ref(false)
+const selectedStickerId = ref('')
+const selectedStickerRenderId = ref('')
+const selectedStickerEmoji = ref('')
+const selectedStickerIsAnimated = ref(false)
+const selectedStickerIsVideo = ref(false)
+const selectedStickerPackName = ref('')
+const stickerError = ref('')
+
+const loadStickerPack = async (packName) => {
+  if (!packName || !packName.trim()) return
+  loadingStickers.value = true
+  stickerError.value = ''
+  loadedStickers.value = []
+  
+  try {
+    const data = await $fetch('/api/stickers/set', {
+      query: { name: packName.trim() }
+    })
+    if (data.success && data.result) {
+      loadedStickers.value = data.result.stickers || []
+      selectedStickerPackName.value = data.result.name
+      if (loadedStickers.value.length === 0) {
+        stickerError.value = 'Sticker pack has no stickers or is empty.'
+      }
+    } else {
+      stickerError.value = 'Sticker pack not found.'
+    }
+  } catch (err) {
+    console.error('Failed to load sticker pack:', err)
+    stickerError.value = err.data?.statusMessage || err.message || 'Sticker pack not found or failed to fetch. Ensure the pack name is correct (case-sensitive).'
+  } finally {
+    loadingStickers.value = false
+  }
+}
+
+const selectSticker = (sticker) => {
+  selectedStickerId.value = sticker.file_id
+  selectedStickerRenderId.value = sticker.thumbnail?.file_id || sticker.thumb?.file_id || sticker.file_id
+  selectedStickerEmoji.value = sticker.emoji || ''
+  selectedStickerIsAnimated.value = sticker.is_animated || false
+  selectedStickerIsVideo.value = sticker.is_video || false
+}
+
+const renderedMessage = computed(() => {
+  if (!message.value) return '<span class="text-slate-400/60 italic">Message body preview...</span>'
+  
+  let text = message.value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  
+  text = text
+    .replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/gi, '<strong>$1</strong>')
+    .replace(/&lt;strong&gt;([\s\S]*?)&lt;\/strong&gt;/gi, '<strong>$1</strong>')
+    .replace(/&lt;i&gt;([\s\S]*?)&lt;\/i&gt;/gi, '<em>$1</em>')
+    .replace(/&lt;em&gt;([\s\S]*?)&lt;\/em&gt;/gi, '<em>$1</em>')
+    .replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, '<span class="underline">$1</span>')
+    .replace(/&lt;s&gt;([\s\S]*?)&lt;\/s&gt;/gi, '<span class="line-through">$1</span>')
+    .replace(/&lt;strike&gt;([\s\S]*?)&lt;\/strike&gt;/gi, '<span class="line-through">$1</span>')
+    .replace(/&lt;del&gt;([\s\S]*?)&lt;\/del&gt;/gi, '<span class="line-through">$1</span>')
+    .replace(/&lt;code&gt;([\s\S]*?)&lt;\/code&gt;/gi, '<code class="bg-black/40 text-pink-400 px-1 py-0.5 rounded font-mono text-xs select-all">$1</code>')
+    .replace(/&lt;pre&gt;([\s\S]*?)&lt;\/pre&gt;/gi, '<pre class="bg-black/40 text-pink-400 p-2 rounded font-mono text-xs block overflow-x-auto select-all">$1</pre>')
+    .replace(/&lt;a\s+href=&quot;([^&]+)&quot;&gt;([\s\S]*?)&lt;\/a&gt;/gi, '<a href="$1" target="_blank" class="text-blue-400 hover:underline">$2</a>')
+    .replace(/&lt;a\s+href=\'([^\']+)\'&gt;([\s\S]*?)&lt;\/a&gt;/gi, '<a href="$1" target="_blank" class="text-blue-400 hover:underline">$2</a>')
+    
+  return text.replace(/\n/g, '<br>')
+})
 
 const addButton = () => {
   buttons.value.push({ text: '', url: '' })
@@ -996,6 +1342,8 @@ const closeConfirmModal = (result) => {
   }
 }
 
+const isTemplateUsed = ref(false)
+
 const applyTemplate = async (text) => {
   if (message.value.trim()) {
     const confirmed = await showConfirmModal(
@@ -1006,7 +1354,14 @@ const applyTemplate = async (text) => {
     if (!confirmed) return
   }
   message.value = text
+  isTemplateUsed.value = true
 }
+
+watch(message, (newVal) => {
+  if (!newVal.trim()) {
+    isTemplateUsed.value = false
+  }
+})
 
 const router = useRouter()
 const route = useRoute()
@@ -1319,6 +1674,22 @@ const groups = computed(() => {
   return data.value?.groups || []
 })
 
+const previewChatTitle = computed(() => {
+  if (selectedGroups.value.length === 0) return 'Telegram Broadcast'
+  const firstGroup = groups.value.find(g => g.id.toString() === selectedGroups.value[0].toString())
+  const title = firstGroup ? firstGroup.title : 'Telegram Broadcast'
+  if (selectedGroups.value.length > 1) {
+    return `${title} (+${selectedGroups.value.length - 1} others)`
+  }
+  return title
+})
+
+const previewChatSub = computed(() => {
+  if (selectedGroups.value.length === 0) return 'broadcast channel'
+  const count = selectedGroups.value.length
+  return `${count} recipient${count > 1 ? 's' : ''}`
+})
+
 const pendingSchedulesCount = computed(() => {
   return schedules.value.filter(s => s.status === 'pending').length
 })
@@ -1333,15 +1704,48 @@ const minDateTime = computed(() => {
   return `${year}-${month}-${day}T${hours}:${minutes}`
 })
 
+const mentionsCount = computed(() => {
+  return groups.value.filter(g => g.has_mention_or_reply).length
+})
+
 const filteredGroups = computed(() => {
-  if (!searchQuery.value.trim()) return groups.value
+  let list = groups.value
+  if (filterMentionsOnly.value) {
+    list = list.filter(g => g.has_mention_or_reply)
+  }
+  if (!searchQuery.value.trim()) return list
   const query = searchQuery.value.toLowerCase()
-  return groups.value.filter(g => 
+  return list.filter(g => 
     g.title.toLowerCase().includes(query) || 
     g.id.toString().includes(query) ||
     g.type.toLowerCase().includes(query)
   )
 })
+
+const getAvatarColorClass = (title) => {
+  if (!title) return 'from-blue-500 to-indigo-500'
+  const colors = [
+    'from-red-500 to-orange-500',
+    'from-orange-500 to-yellow-500',
+    'from-green-500 to-emerald-500',
+    'from-teal-500 to-cyan-500',
+    'from-blue-500 to-indigo-500',
+    'from-purple-500 to-pink-500',
+    'from-pink-500 to-rose-500'
+  ]
+  let hash = 0
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const index = Math.abs(hash) % colors.length
+  return colors[index]
+}
+
+const stripHtml = (html) => {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '')
+}
+
 
 const allFilteredSelected = computed(() => {
   if (filteredGroups.value.length === 0) return false
@@ -1452,7 +1856,8 @@ const deleteScheduleHistory = async (id) => {
 }
 
 const reuseMessage = async (schedule) => {
-  if (message.value.trim() || selectedGroups.value.length > 0) {
+  const hasDraft = message.value.trim() || selectedGroups.value.length > 0 || selectedStickerId.value;
+  if (hasDraft) {
     const confirmed = await showConfirmModal(
       'Load Selected Message?',
       'Loading this message will overwrite your current composer draft (message content and selected recipients). Do you want to proceed?',
@@ -1461,7 +1866,21 @@ const reuseMessage = async (schedule) => {
     if (!confirmed) return
   }
   
-  message.value = schedule.message || ''
+  if (schedule.file_type === 'sticker' && schedule.sticker_id) {
+    composeMode.value = 'sticker'
+    selectedStickerId.value = schedule.sticker_id
+    selectedStickerRenderId.value = schedule.sticker_thumb_id || schedule.sticker_id
+    selectedStickerEmoji.value = ''
+    message.value = ''
+    loadedStickers.value = []
+    stickerError.value = ''
+  } else {
+    composeMode.value = 'text'
+    selectedStickerId.value = ''
+    selectedStickerRenderId.value = ''
+    selectedStickerEmoji.value = ''
+    message.value = schedule.message || ''
+  }
   
   if (schedule.buttons && Array.isArray(schedule.buttons) && schedule.buttons.length > 0) {
     hasButtons.value = true
@@ -1484,12 +1903,16 @@ const reuseMessage = async (schedule) => {
   }
   
   router.push({ query: { tab: 'send' } })
-  success.value = 'Message and recipients loaded into the composer.'
+  triggerToast('Message and recipients loaded into the composer.', 'success')
   error.value = ''
 }
 
 const sendAnnouncement = async () => {
-  if ((!message.value.trim() && !attachedFile.value) || selectedGroups.value.length === 0) return
+  if (composeMode.value === 'sticker') {
+    if (!selectedStickerId.value || selectedGroups.value.length === 0) return
+  } else {
+    if ((!message.value.trim() && !attachedFile.value) || selectedGroups.value.length === 0) return
+  }
   if (activeTab.value === 'schedule') {
     if (scheduleType.value === 'once' && !scheduleTime.value) return
     if (scheduleType.value === 'recurring' && !cronExpression.value.trim()) return
@@ -1503,9 +1926,14 @@ const sendAnnouncement = async () => {
     const formData = new FormData()
     formData.append('message', message.value)
     selectedGroups.value.forEach(id => formData.append('chatIds', id))
-    if (attachedFile.value) {
+    
+    if (composeMode.value === 'sticker') {
+      formData.append('stickerId', selectedStickerId.value)
+      formData.append('stickerThumbId', selectedStickerRenderId.value)
+    } else if (attachedFile.value) {
       formData.append('file', attachedFile.value)
     }
+    
     if (hasButtons.value && buttons.value.length > 0) {
       const validButtons = buttons.value.filter(b => b.text.trim() && b.url.trim())
       if (validButtons.length > 0) {
@@ -1526,17 +1954,25 @@ const sendAnnouncement = async () => {
         body: formData
       })
       if (res.success) {
-        message.value = ''
-        selectedGroups.value = []
-        scheduleTime.value = ''
+        if (!isTemplateUsed.value) {
+          message.value = ''
+        }
         attachedFile.value = null
+        selectedStickerId.value = ''
+        selectedStickerRenderId.value = ''
+        selectedStickerEmoji.value = ''
+        composeMode.value = 'text'
         hasButtons.value = false
         buttons.value = []
+        scheduleTime.value = ''
+        if (fileInput.value) {
+          fileInput.value.value = ''
+        }
         if (previewUrl.value) {
           URL.revokeObjectURL(previewUrl.value)
           previewUrl.value = null
         }
-        success.value = 'Announcement successfully scheduled.'
+        triggerToast('Announcement successfully scheduled.', 'success')
         router.push({ query: { tab: 'queue' } })
         await fetchSchedules()
       }
@@ -1547,19 +1983,28 @@ const sendAnnouncement = async () => {
       })
       
       if (res.success) {
-        message.value = ''
-        selectedGroups.value = []
+        if (!isTemplateUsed.value) {
+          message.value = ''
+        }
         attachedFile.value = null
+        selectedStickerId.value = ''
+        selectedStickerRenderId.value = ''
+        selectedStickerEmoji.value = ''
+        composeMode.value = 'text'
         hasButtons.value = false
         buttons.value = []
+        if (fileInput.value) {
+          fileInput.value.value = ''
+        }
         if (previewUrl.value) {
           URL.revokeObjectURL(previewUrl.value)
           previewUrl.value = null
         }
-        success.value = `Successfully broadcasted to ${res.sent} recipient(s).`
+        let msg = `Successfully broadcasted to ${res.sent} recipient(s).`
         if (res.failed > 0) {
-          success.value += ` Failed to send to ${res.failed} recipient(s).`
+          msg += ` Failed to send to ${res.failed} recipient(s).`
         }
+        triggerToast(msg, 'success')
       }
     }
   } catch (err) {
@@ -1569,3 +2014,30 @@ const sendAnnouncement = async () => {
   }
 }
 </script>
+
+<style scoped>
+.chat-bg-pattern {
+  background-color: #0e1621;
+  background-image: radial-gradient(rgba(43, 82, 120, 0.15) 1.5px, transparent 0), radial-gradient(rgba(43, 82, 120, 0.15) 1.5px, transparent 0);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+</style>

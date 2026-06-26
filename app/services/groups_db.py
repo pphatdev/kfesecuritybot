@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,22 @@ def track_group(chat_id: int, title: str):
     current_data = data.get(str_id, {})
     
     if current_data.get("title") != title_val:
-        data[str_id] = {
-            "title": title_val
-        }
+        current_data["title"] = title_val
+        data[str_id] = current_data
         save_groups(data)
+
+def record_group_mention_or_reply(chat_id: int, title: str):
+    """Flag that a group has had a bot mention or reply and record timestamp."""
+    if not chat_id:
+        return
+    data = load_groups()
+    str_id = str(chat_id)
+    title_val = title.strip() if title else f"Group {str_id}"
+    
+    current_data = data.get(str_id, {})
+    current_data["title"] = title_val
+    current_data["has_mention_or_reply"] = True
+    current_data["last_mention_or_reply_at"] = int(time.time())
+    data[str_id] = current_data
+    save_groups(data)
+

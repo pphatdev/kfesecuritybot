@@ -5,6 +5,7 @@ import path from 'node:path'
  * Parses and returns key-value pairs from the parent directory's .env file.
  */
 export function getParentEnv(): Record<string, string> {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
   const envPath = path.resolve(process.cwd(), '../.env')
   if (!fs.existsSync(envPath)) {
     return {}

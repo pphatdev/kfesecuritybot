@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,22 @@ def track_user(user_id: int, username: str):
     current_data = data.get(str_id, {})
     
     if current_data.get("username") != username_val:
-        data[str_id] = {
-            "username": username_val
-        }
+        current_data["username"] = username_val
+        data[str_id] = current_data
         save_users(data)
+
+def record_user_mention_or_reply(user_id: int, username: str):
+    """Flag that a user has had a bot mention or reply and record timestamp."""
+    if not user_id:
+        return
+    data = load_users()
+    str_id = str(user_id)
+    username_val = username.strip().lower() if username else ""
+    
+    current_data = data.get(str_id, {})
+    current_data["username"] = username_val
+    current_data["has_mention_or_reply"] = True
+    current_data["last_mention_or_reply_at"] = int(time.time())
+    data[str_id] = current_data
+    save_users(data)
+

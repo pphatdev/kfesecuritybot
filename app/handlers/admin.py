@@ -15,11 +15,6 @@ async def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return member.status in (ChatMember.ADMINISTRATOR, ChatMember.OWNER)
 
 
-
-
-
-
-
 async def _is_caller_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Check if the caller is an env-configured admin or a group admin."""
     user = update.effective_user
@@ -37,6 +32,18 @@ async def _is_caller_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             
     return False
 
+
+async def _is_superadmin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if the caller is an env-configured super admin."""
+    user = update.effective_user
+    
+    admin_usernames = [u.strip().lower() for u in (os.getenv("DASHBOARD_ADMINS") or "").split(",") if u.strip()]
+    admin_ids = [i.strip() for i in (os.getenv("DASHBOARD_ADMIN_IDS") or "").split(",") if i.strip()]
+    
+    if str(user.id) in admin_ids or (user.username and user.username.lower() in admin_usernames):
+        return True
+            
+    return False
 
 async def adduser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -62,16 +69,17 @@ async def adduser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def removeuser_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    /removeuser <username|user_id>
+    /removeuser or /deleteuser <username|user_id>
     Example: /removeuser @another_admin
     """
-    if not await _is_caller_admin(update, context):
-        await update.message.reply_text("⛔ Only bot creators or group admins can remove dashboard users.")
+    if not await _is_superadmin(update, context):
+        await update.message.reply_text("⛔ Only superadmins can remove dashboard users.")
         return
 
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /removeuser <username|user_id>\nExample: /removeuser @another_admin")
+        cmd = update.message.text.split()[0].split('@')[0] if update.message.text else "/removeuser"
+        await update.message.reply_text(f"Usage: {cmd} <username|user_id>\nExample: {cmd} @another_admin")
         return
         
     target = args[0]

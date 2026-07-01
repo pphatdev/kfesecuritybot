@@ -54,6 +54,7 @@ def main() -> None:
     # Admin commands (dashboard access management)
     application.add_handler(CommandHandler("adduser", adduser_command))
     application.add_handler(CommandHandler("removeuser", removeuser_command))
+    application.add_handler(CommandHandler("deleteuser", removeuser_command))
 
     # Message handlers — handle_message also handles mention replies internally
     application.add_handler(MessageHandler((filters.ALL | filters.UpdateType.CHANNEL_POST) & ~filters.COMMAND, handle_message))

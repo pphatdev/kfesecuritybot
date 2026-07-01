@@ -10,6 +10,9 @@ export default defineEventHandler(async (event) => {
     let buttons: Array<{ text: string, url: string }> = []
     let buttonText = ''
     let buttonUrl = ''
+    let stickerThumbId = ''
+    let isAnimated = false
+    let isVideo = false
 
     // Check content type to see if it's multipart
     const contentType = getRequestHeader(event, 'content-type') || ''
@@ -36,6 +39,12 @@ export default defineEventHandler(async (event) => {
             buttonText = field.data.toString('utf-8')
           } else if (field.name === 'buttonUrl') {
             buttonUrl = field.data.toString('utf-8')
+          } else if (field.name === 'stickerThumbId') {
+            stickerThumbId = field.data.toString('utf-8')
+          } else if (field.name === 'isAnimated') {
+            isAnimated = field.data.toString('utf-8') === 'true'
+          } else if (field.name === 'isVideo') {
+            isVideo = field.data.toString('utf-8') === 'true'
           }
         }
       }
@@ -49,6 +58,9 @@ export default defineEventHandler(async (event) => {
       }
       buttonText = body.buttonText || ''
       buttonUrl = body.buttonUrl || ''
+      stickerThumbId = body.stickerThumbId || ''
+      isAnimated = body.isAnimated === true || body.isAnimated === 'true'
+      isVideo = body.isVideo === true || body.isVideo === 'true'
     }
 
     if (!fileData && !stickerId && (!message || typeof message !== 'string')) {
@@ -187,6 +199,9 @@ export default defineEventHandler(async (event) => {
           time: timeStr,
           is_bot: true,
           sticker_id: stickerId || null,
+          sticker_thumb_id: stickerThumbId || null,
+          is_animated: isAnimated,
+          is_video: isVideo,
           media_type: mediaType || null,
           media_name: fileData ? fileData.filename : null,
           buttons: msgButtons,

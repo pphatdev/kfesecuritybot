@@ -284,8 +284,17 @@
                       
                       <div v-else>
                         <!-- Sticker render -->
-                        <div v-if="msg.sticker_id" class="w-[120px] h-[120px] flex items-center justify-center py-1">
-                          <img :src="`/api/stickers/image?file_id=${msg.sticker_id}`" class="w-full h-full object-contain pointer-events-none" />
+                        <div v-if="msg.sticker_id" class="w-[120px] h-[120px] flex items-center justify-center py-1 relative">
+                          <img v-if="msg.sticker_thumb_id" :src="`/api/stickers/image?file_id=${msg.sticker_thumb_id}`" class="w-full h-full object-contain pointer-events-none" @error="$event.target.style.display='none'" />
+                          <lottie-player v-else-if="msg.is_animated" :src="`/api/stickers/image.json?file_id=${msg.sticker_id}`" autoplay loop background="transparent" style="width: 100%; height: 100%;"></lottie-player>
+                          <video v-else-if="msg.is_video" :src="`/api/stickers/image?file_id=${msg.sticker_id}`" autoplay loop muted playsinline class="w-full h-full object-contain"></video>
+                          
+                          <!-- Dynamic fallback cascade for old messages -->
+                          <template v-else>
+                            <img v-if="!failedStickerTypes[msg.message_id]" :src="`/api/stickers/image?file_id=${msg.sticker_id}`" class="w-full h-full object-contain pointer-events-none" @error="handleStickerImageError(msg.message_id)" />
+                            <video v-else-if="failedStickerTypes[msg.message_id] === 'video'" :src="`/api/stickers/image?file_id=${msg.sticker_id}`" autoplay loop muted playsinline class="w-full h-full object-contain" @error="handleStickerVideoError(msg.message_id)"></video>
+                            <lottie-player v-else-if="failedStickerTypes[msg.message_id] === 'lottie'" :src="`/api/stickers/image.json?file_id=${msg.sticker_id}`" autoplay loop background="transparent" style="width: 100%; height: 100%;"></lottie-player>
+                          </template>
                         </div>
                         
                         <!-- Media file attachment placeholder -->
@@ -299,7 +308,7 @@
                         </div>
 
                         <!-- Main text -->
-                        <div v-if="msg.text" v-html="msg.text" class="break-words leading-relaxed select-text pr-1"></div>
+                        <div v-if="msg.text" v-html="msg.text" class="wrap-break-word leading-relaxed select-text pr-1"></div>
                       </div>
 
                       <div class="text-[8px] text-slate-500 mt-1 text-right font-mono select-none">
@@ -402,7 +411,7 @@
               leave-from-class="translate-y-0"
               leave-to-class="translate-y-full"
             >
-              <div v-if="composeMode === 'sticker'" class="absolute bottom-16 inset-x-0 bg-[#17212b] border-t border-[#101921] h-[340px] flex flex-col z-20 shadow-2xl animate-in">
+              <div v-if="composeMode === 'sticker'" class="absolute bottom-16 inset-x-0 bg-[#17212b] border-t border-[#101921] h-[340px] flex flex-col z-[20] shadow-2xl animate-in">
                 <div class="p-3 border-b border-[#101921] flex gap-2 shrink-0 select-none">
                   <!-- Mini search for sticker sets -->
                   <div class="relative flex-1">
@@ -457,12 +466,17 @@
                       class="group relative flex items-center justify-center p-1.5 rounded-lg bg-[#182533] hover:bg-[#202b36] border border-slate-700/50 cursor-pointer transition-all aspect-square overflow-hidden hover:scale-105"
                       :class="{'border-2 border-primary ring-2 ring-primary/20': selectedStickerId === stk.file_id}"
                     >
-                      <div v-if="stk.is_animated" class="w-full h-full flex items-center justify-center">
-                        <lottie-player :src="`/api/stickers/image?file_id=${stk.file_id}`" autoplay loop background="transparent" style="width: 100%; height: 100%;"></lottie-player>
+                      <div class="w-full h-full relative flex items-center justify-center">
+                        <img v-if="stk.thumbnail?.file_id || stk.thumb?.file_id" :src="`/api/stickers/image?file_id=${stk.thumbnail?.file_id || stk.thumb?.file_id}`" class="w-full h-full object-contain pointer-events-none" loading="lazy" @error="$event.target.style.display='none'" />
+                        <lottie-player v-else-if="stk.is_animated" :src="`/api/stickers/image.json?file_id=${stk.file_id}`" autoplay loop background="transparent" style="width: 100%; height: 100%;"></lottie-player>
+                        <video v-else-if="stk.is_video" :src="`/api/stickers/image?file_id=${stk.file_id}`" autoplay loop muted playsinline class="w-full h-full object-contain"></video>
+                        <img v-else :src="`/api/stickers/image?file_id=${stk.file_id}`" class="w-full h-full object-contain pointer-events-none" loading="lazy" @error="$event.target.style.display='none'" />
+                        
+                        <div v-if="stk.is_animated || stk.is_video" class="absolute bottom-0.5 right-0.5 bg-black/70 text-slate-200 text-[7px] px-1 py-0.5 rounded uppercase font-bold tracking-wider shadow-sm backdrop-blur-sm z-10 pointer-events-none">
+                          {{ stk.is_animated ? 'Animated' : 'Video' }}
+                        </div>
                       </div>
-                      <video v-else-if="stk.is_video" :src="`/api/stickers/image?file_id=${stk.file_id}`" autoplay loop muted playsinline class="w-full h-full object-contain"></video>
-                      <img v-else :src="`/api/stickers/image?file_id=${stk.thumbnail?.file_id || stk.thumb?.file_id || stk.file_id}`" class="w-full h-full object-contain pointer-events-none" loading="lazy" />
-                      <div v-if="selectedStickerId === stk.file_id" class="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-white flex items-center justify-center shadow">
+                      <div v-if="selectedStickerId === stk.file_id" class="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-white flex items-center justify-center shadow z-20">
                         <IconCheck class="w-2 h-2" />
                       </div>
                     </div>
@@ -493,10 +507,28 @@
         >
           <div v-show="showRightSidebar" class="w-80 shrink-0 border-l border-[#101921] flex flex-col bg-[#17212b] overflow-y-auto p-4 space-y-5 select-none scrollbar-thin">
           <div class="flex items-center justify-between pb-3 border-b border-[#101921] shrink-0">
-              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Broadcast Settings</span>
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Info & Settings</span>
               <button type="button" @click="showRightSidebar = false" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-500/10 cursor-pointer">
                 <IconX class="w-4 h-4" />
               </button>
+            </div>
+
+            <!-- Active Profile Info -->
+            <div v-if="activeGroup" class="flex flex-col items-center bg-[#202b36] p-4 rounded-xl border border-slate-700/30 text-center relative overflow-hidden shrink-0">
+              <div class="absolute inset-x-0 top-0 h-10 bg-linear-to-r from-primary/20 to-blue-500/10"></div>
+              <div class="w-16 h-16 rounded-full bg-linear-to-tr text-white font-bold flex items-center justify-center shadow-lg text-xl select-none border-2 border-[#17212b] z-[10] uppercase mt-2 mb-3" :class="getAvatarColorClass(activeGroup.title)">
+                {{ activeGroup.title ? activeGroup.title.charAt(0) : 'G' }}
+              </div>
+              <h3 class="text-sm font-bold text-slate-100 truncate w-full">{{ activeGroup.title }}</h3>
+              <p class="text-[10px] text-slate-400 font-mono mt-1 mb-2">{{ activeGroup.id }}</p>
+              <div class="flex items-center justify-center gap-2 flex-wrap">
+                <span class="text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-sm" :class="activeGroup.type === 'Private Chat' ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'">
+                  {{ activeGroup.type }}
+                </span>
+                <span v-if="activeGroup.has_mention_or_reply" class="text-[9px] font-bold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-sm" title="Bot was mentioned or replied to in this chat">
+                  💬 Mentioned
+                </span>
+              </div>
             </div>
 
             <!-- Scheduler settings section -->
@@ -543,7 +575,7 @@
                   </button>
                   
                   <!-- Datepicker dropdown popover -->
-                  <div v-if="isDropdownOpen" class="absolute right-0 bottom-full mb-2 z-30 bg-[#17212b] border border-[#101921] rounded-xl p-3 w-[260px] shadow-2xl animate-fade-in text-[11px]">
+                  <div v-if="isDropdownOpen" class="absolute right-0 bottom-full mb-2 z-[30] bg-[#17212b] border border-[#101921] rounded-xl p-3 w-[260px] shadow-2xl animate-fade-in text-[11px]">
                     <div class="flex items-center justify-between pb-2 border-b border-[#101921] mb-2">
                       <button type="button" @click="prevMonth" class="text-slate-400 hover:text-white cursor-pointer"><IconChevronLeft class="w-3.5 h-3.5" /></button>
                       <span class="font-bold text-slate-200">{{ monthNames[currentMonth] }} {{ currentYear }}</span>
@@ -753,8 +785,10 @@
               <td class="py-3.5 px-4 font-normal text-(--text-body) max-w-xs sm:max-w-md truncate">
                 <div class="flex flex-col gap-1">
                   <div v-if="schedule.file_type === 'sticker'" class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded bg-slate-500/5 border border-(--border-color) p-0.5 flex items-center justify-center shrink-0">
-                      <img :src="`/api/stickers/image?file_id=${schedule.sticker_thumb_id || schedule.sticker_id}`" class="w-full h-full object-contain" />
+                    <div class="w-12 h-12 rounded-2xl bg-linear-to-r from-primary/20 to-primary-subtle border border-primary/20 flex items-center justify-center shrink-0">
+                      <div class="w-8 h-8 rounded-full bg-linear-to-tr from-primary to-blue-400 shadow-inner flex items-center justify-center">
+                        <img :src="`/api/stickers/image?file_id=${schedule.sticker_thumb_id || schedule.sticker_id}`" class="w-full h-full object-contain" />
+                      </div>
                     </div>
                     <span class="text-xs text-(--text-muted)">Sticker Broadcast</span>
                   </div>
@@ -975,7 +1009,7 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="toast.show" class="fixed top-5 right-5 z-[9999] max-w-sm w-full bg-slate-900/95 border border-slate-700/50 backdrop-blur-md rounded-xl p-4 shadow-2xl flex items-start gap-3 select-none pointer-events-auto">
+      <div v-if="toast.show" class="fixed top-5 right-5 z-9999 max-w-sm w-full bg-slate-900/95 border border-slate-700/50 backdrop-blur-md rounded-xl p-4 shadow-2xl flex items-start gap-3 select-none pointer-events-auto">
         <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" :class="toast.type === 'success' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
           <IconCheck class="w-4 h-4" v-if="toast.type === 'success'" />
           <IconAlertCircle class="w-4 h-4" v-else />
@@ -1065,6 +1099,19 @@ const activeChatId = computed(() => {
   return selectedGroups.value.length > 0 ? selectedGroups.value[0].toString() : null
 })
 
+const failedStickerTypes = ref({})
+
+const handleStickerImageError = (msgId) => {
+  if (!failedStickerTypes.value[msgId]) {
+    failedStickerTypes.value[msgId] = 'video'
+  }
+}
+const handleStickerVideoError = (msgId) => {
+  if (failedStickerTypes.value[msgId] === 'video') {
+    failedStickerTypes.value[msgId] = 'lottie'
+  }
+}
+
 const fetchChatHistory = async () => {
   const chatId = activeChatId.value
   if (!chatId) {
@@ -1127,7 +1174,7 @@ onMounted(() => {
 useHead({
   script: [
     {
-      src: 'https://unpkg.com/@lottiefiles/lottie-player@1.7.1/dist/lottie-player.js',
+      src: '/api/lottie-player.js',
       defer: true
     }
   ]
@@ -1676,7 +1723,7 @@ const groups = computed(() => {
 
 const previewChatTitle = computed(() => {
   if (selectedGroups.value.length === 0) return 'Telegram Broadcast'
-  const firstGroup = groups.value.find(g => g.id.toString() === selectedGroups.value[0].toString())
+  const firstGroup = groups.value.find(g => g.id.toString() === selectedGroups.value[0].toString() || g.id === selectedGroups.value[0])
   const title = firstGroup ? firstGroup.title : 'Telegram Broadcast'
   if (selectedGroups.value.length > 1) {
     return `${title} (+${selectedGroups.value.length - 1} others)`
@@ -1687,7 +1734,14 @@ const previewChatTitle = computed(() => {
 const previewChatSub = computed(() => {
   if (selectedGroups.value.length === 0) return 'broadcast channel'
   const count = selectedGroups.value.length
-  return `${count} recipient${count > 1 ? 's' : ''}`
+  return count === 1 ? (activeGroup.value?.type || 'Private Chat') : `${count} recipients`
+})
+
+const activeGroup = computed(() => {
+  if (selectedGroups.value.length === 1) {
+    return groups.value.find(g => g.id.toString() === selectedGroups.value[0].toString() || g.id === selectedGroups.value[0])
+  }
+  return null
 })
 
 const pendingSchedulesCount = computed(() => {
@@ -1930,6 +1984,8 @@ const sendAnnouncement = async () => {
     if (composeMode.value === 'sticker') {
       formData.append('stickerId', selectedStickerId.value)
       formData.append('stickerThumbId', selectedStickerRenderId.value)
+      formData.append('isAnimated', selectedStickerIsAnimated.value)
+      formData.append('isVideo', selectedStickerIsVideo.value)
     } else if (attachedFile.value) {
       formData.append('file', attachedFile.value)
     }

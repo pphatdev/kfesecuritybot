@@ -64,7 +64,8 @@ export default defineEventHandler(async (event) => {
     } else if (lowerPath.endsWith('.webm')) {
       mimeType = 'video/webm'
     } else if (lowerPath.endsWith('.tgs')) {
-      mimeType = 'application/json'
+      // Force text/plain to prevent lottie-player from crashing on xhr.responseText
+      mimeType = 'text/plain'
       try {
         dataBuffer = zlib.gunzipSync(dataBuffer)
       } catch (err) {
@@ -75,6 +76,9 @@ export default defineEventHandler(async (event) => {
     setResponseHeader(event, 'Content-Type', mimeType)
     setResponseHeader(event, 'Cache-Control', 'public, max-age=31536000, immutable')
 
+    if (mimeType === 'application/json' || mimeType === 'text/plain') {
+      return dataBuffer.toString('utf-8')
+    }
     return dataBuffer
   } catch (error: any) {
     console.error('Error in stickers/image proxy:', error)

@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
       delete data.violations[String(userId)]
       
       // Log the action
-      const now_str = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      const now_str = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Phnom_Penh' })
       const activity = {
         time: now_str,
         type: "action",

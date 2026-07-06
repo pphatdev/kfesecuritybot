@@ -186,7 +186,7 @@ export default defineEventHandler(async (event) => {
         
         // Format time (e.g. "02:35 PM")
         const now = new Date()
-        const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'Asia/Phnom_Penh' })
         
         const msgButtons = inlineKeyboard.length > 0 ? inlineKeyboard.map(row => row[0]) : null
 

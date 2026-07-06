@@ -1149,10 +1149,11 @@ const formattedCurrentTime = ref('12:00 PM')
 
 onMounted(() => {
   const updateClock = () => {
-    formattedCurrentTime.value = new Date().toLocaleTimeString(undefined, {
+    formattedCurrentTime.value = new Date().toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: false,
+      timeZone: 'Asia/Phnom_Penh'
     })
   }
   updateClock()
@@ -1654,13 +1655,14 @@ const formattedScheduleTime = computed(() => {
   if (!scheduleTime.value) return ''
   const date = new Date(scheduleTime.value)
   if (isNaN(date.getTime())) return ''
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true
+    hour12: false,
+    timeZone: 'Asia/Phnom_Penh'
   })
 })
 
@@ -1848,7 +1850,10 @@ const truncateText = (text, limit) => {
 const formatDateTime = (isoString) => {
   if (!isoString) return ''
   const date = new Date(isoString)
-  return date.toLocaleString()
+  return date.toLocaleString('en-US', {
+    timeZone: 'Asia/Phnom_Penh',
+    hour12: false
+  })
 }
 
 const getStatusBadgeClass = (status) => {

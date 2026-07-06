@@ -50,10 +50,12 @@ async def check_and_send_scheduled_messages(application: Application):
         if cron_expr and (not msg.get("sendAt") or msg.get("sendAt") == ""):
             try:
                 from croniter import croniter
-                base_time = datetime.now(timezone.utc)
+                from zoneinfo import ZoneInfo
+                base_time = datetime.now(ZoneInfo('Asia/Phnom_Penh'))
                 iter = croniter(cron_expr, base_time)
                 next_time = iter.get_next(datetime)
-                msg["sendAt"] = next_time.isoformat().replace("+00:00", "Z")
+                next_time_utc = next_time.astimezone(timezone.utc)
+                msg["sendAt"] = next_time_utc.isoformat().replace("+00:00", "Z")
                 modified = True
             except Exception as e:
                 logger.error(f"Invalid cron expression for message {msg.get('id')}: {e}")
@@ -169,10 +171,12 @@ async def check_and_send_scheduled_messages(application: Application):
             if msg.get("cron"):
                 try:
                     from croniter import croniter
-                    base_time = datetime.now(timezone.utc)
+                    from zoneinfo import ZoneInfo
+                    base_time = datetime.now(ZoneInfo('Asia/Phnom_Penh'))
                     iter = croniter(msg["cron"], base_time)
                     next_time = iter.get_next(datetime)
-                    msg["sendAt"] = next_time.isoformat().replace("+00:00", "Z")
+                    next_time_utc = next_time.astimezone(timezone.utc)
+                    msg["sendAt"] = next_time_utc.isoformat().replace("+00:00", "Z")
                     msg["status"] = "pending"
                     
                     if "history" not in msg:

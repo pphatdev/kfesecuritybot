@@ -76,6 +76,20 @@
         @delete="w => deleteKeyword(w, 'sticker')"
         @edit="payload => editKeyword(payload, 'sticker')"
       />
+
+      <KeywordList
+        v-else-if="activeTab === 'file_ext'"
+        :items="filteredFileExt"
+        title="File Extension Filter"
+        description="These file extensions will be blocked when users upload documents."
+        color-class="bg-fuchsia-500"
+        item-class="border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-500"
+        btn-class="text-fuchsia-500/70 hover:text-fuchsia-500 hover:bg-fuchsia-500/20"
+        :icon="IconFileX"
+        empty-message="No matching file extensions found."
+        @delete="w => deleteKeyword(w, 'file_ext')"
+        @edit="payload => editKeyword(payload, 'file_ext')"
+      />
     </div>
     
     <div v-else class="glass-card rounded-xl min-h-[400px] flex flex-col items-center justify-center gap-4 text-(--text-muted)">
@@ -136,7 +150,7 @@ import KeywordSearch from '~/components/KeywordSearch.vue'
 import KeywordForm from '~/components/KeywordForm.vue'
 import KeywordTabs from '~/components/KeywordTabs.vue'
 import KeywordList from '~/components/KeywordList.vue'
-import { IconBan, IconShieldX, IconCode, IconAlertTriangle, IconAlertCircle, IconCheck } from '@tabler/icons-vue'
+import { IconBan, IconShieldX, IconCode, IconAlertTriangle, IconAlertCircle, IconCheck, IconFileX } from '@tabler/icons-vue'
 
 const { data: keywords, pending, refresh } = useFetch('/api/keywords')
 const router = useRouter()
@@ -173,6 +187,15 @@ const filteredSticker = computed(() => {
   if (!keywords.value?.sticker) return []
   if (!searchQuery.value) return keywords.value.sticker
   return keywords.value.sticker.filter(word => {
+    if (typeof word !== 'string') return false
+    return word.toLowerCase().includes(searchQuery.value.toLowerCase())
+  })
+})
+
+const filteredFileExt = computed(() => {
+  if (!keywords.value?.file_ext) return []
+  if (!searchQuery.value) return keywords.value.file_ext
+  return keywords.value.file_ext.filter(word => {
     if (typeof word !== 'string') return false
     return word.toLowerCase().includes(searchQuery.value.toLowerCase())
   })

@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
     const data = JSON.parse(fileData)
     if (!data.pattern) data.pattern = []
     if (!data.sticker) data.sticker = []
+    if (!data.file_ext) data.file_ext = []
     
     if (data[category]) {
       if (category === 'pattern') {

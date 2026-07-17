@@ -12,6 +12,8 @@ export default defineEventHandler((event) => {
         spam: [], 
         toxic: [], 
         pattern: [],
+        sticker: [],
+        file_ext: [],
         debug_error: "File not found", 
         debug_path: filePath 
       }
@@ -19,6 +21,10 @@ export default defineEventHandler((event) => {
     
     const fileData = fs.readFileSync(filePath, 'utf-8')
     const parsedData = JSON.parse(fileData)
+    
+    if (!parsedData.file_ext) {
+      parsedData.file_ext = []
+    }
     
     // Normalize pattern array to objects for the UI
     if (parsedData.pattern && Array.isArray(parsedData.pattern)) {

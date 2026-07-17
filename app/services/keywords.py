@@ -54,6 +54,8 @@ _DEFAULT_PATTERN = []
 
 _DEFAULT_STICKER = []
 
+_DEFAULT_FILE_EXT = [".exe", ".apk", ".bat", ".scr", ".vbs"]
+
 
 def _load_all() -> dict:
     """
@@ -61,7 +63,7 @@ def _load_all() -> dict:
     If the file doesn't exist, initialize it with the built-in defaults.
     """
     if not KEYWORDS_FILE.exists():
-        data = {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy(), "sticker": _DEFAULT_STICKER.copy()}
+        data = {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy(), "sticker": _DEFAULT_STICKER.copy(), "file_ext": _DEFAULT_FILE_EXT.copy()}
         _save(data)
         logger.info("Initialized keywords.json with built-in defaults.")
         return data
@@ -73,10 +75,12 @@ def _load_all() -> dict:
                 data["pattern"] = _DEFAULT_PATTERN.copy()
             if "sticker" not in data:
                 data["sticker"] = _DEFAULT_STICKER.copy()
+            if "file_ext" not in data:
+                data["file_ext"] = _DEFAULT_FILE_EXT.copy()
             return data
     except Exception as e:
         logger.error(f"Failed to load keywords.json: {e}")
-        return {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy(), "sticker": _DEFAULT_STICKER.copy()}
+        return {"spam": _DEFAULT_SPAM.copy(), "toxic": _DEFAULT_TOXIC.copy(), "pattern": _DEFAULT_PATTERN.copy(), "sticker": _DEFAULT_STICKER.copy(), "file_ext": _DEFAULT_FILE_EXT.copy()}
 
 
 def _save(data: dict):
@@ -112,7 +116,7 @@ def remove_keyword(word: str) -> bool:
     data = _load_all()
     removed = False
     
-    for cat in ("spam", "toxic", "sticker"):
+    for cat in ("spam", "toxic", "sticker", "file_ext"):
         target_word = word.lower()
         if target_word in data.get(cat, []):
             data[cat].remove(target_word)
@@ -170,14 +174,21 @@ async def get_sticker_index(sticker, bot) -> int:
         return -1
 
 
-async def pre_check(text: str, sticker=None, bot=None) -> tuple[str, str | None] | None:
+async def pre_check(text: str, sticker=None, bot=None, document_name: str = None) -> tuple[str, str | None] | None:
     """
     Check text against keyword lists.
     All keywords are read from the JSON file on every call — no restart needed.
-    Returns ('Spam', None), ('Toxic', None), ('Pattern', custom_response) or None.
+    Returns ('Spam', None), ('Toxic', None), ('Pattern', custom_response), ('FileExt', custom_response) or None.
     """
     lower = text.lower()
     data = _load_all()
+
+    if document_name:
+        doc_lower = document_name.lower()
+        for ext in data.get("file_ext", []):
+            ext_str = ext.strip().lower()
+            if ext_str and doc_lower.endswith(ext_str):
+                return ("FileExt", f"Banned File Extension ({ext_str})")
 
     for kw in data.get("spam", []):
         if kw.lower() in lower:

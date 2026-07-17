@@ -181,7 +181,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- Step 1: Keyword pre-check against built-in + custom admin list ---
-    pre_result = await pre_check(text, sticker=message.sticker, bot=context.bot)
+    pre_result = await pre_check(text, sticker=message.sticker, bot=context.bot, document_name=media_name)
 
     if pre_result:
         match_type, custom_reason = pre_result if isinstance(pre_result, tuple) else (pre_result, None)
@@ -197,6 +197,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif match_type == "Sticker":
             category = "spam"
             display_reason = custom_reason or "Banned Sticker Pack"
+        elif match_type == "FileExt":
+            category = "spam"
+            display_reason = custom_reason or "Banned File Extension"
         else:
             # Both "Spam" and "Pattern" map to the "spam" category for strike tracking
             category = "spam"

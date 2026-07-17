@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-import { IconBan, IconShieldX, IconCode, IconAlertTriangle } from '@tabler/icons-vue'
+import { IconBan, IconShieldX, IconCode, IconAlertTriangle, IconFileX } from '@tabler/icons-vue'
 import { useRoute } from 'vue-router'
 
 const props = defineProps({
@@ -44,7 +44,8 @@ const tabs = [
   { id: 'spam', label: 'Spam Patterns', icon: IconBan },
   { id: 'toxic', label: 'Toxic Patterns', icon: IconShieldX },
   { id: 'pattern', label: 'Regex Patterns', icon: IconCode },
-  { id: 'sticker', label: 'Sticker Packs', icon: IconAlertTriangle }
+  { id: 'sticker', label: 'Sticker Packs', icon: IconAlertTriangle },
+  { id: 'file_ext', label: 'File Extensions', icon: IconFileX }
 ]
 
 function getCount(tabId) {

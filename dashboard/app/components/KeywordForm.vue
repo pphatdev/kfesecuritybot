@@ -15,7 +15,7 @@
           v-model="word"
           unstyled
           class="block w-full px-3 py-2.5 border border-(--border-color) rounded-lg text-sm bg-(--bg-card) text-(--text-body) focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
-          :placeholder="category === 'sticker' ? 'e.g. MyPackName, 😀, or AgAD...' : 'e.g. crypto, free money...'"
+          :placeholder="category === 'sticker' ? 'e.g. MyPackName, 😀, or AgAD...' : (category === 'file_ext' ? 'e.g. .exe, .apk...' : 'e.g. crypto, free money...')"
           @keyup.enter="handleAdd"
         />
       </div>
@@ -82,7 +82,8 @@ const categoryOptions = [
   { label: 'Spam / Promo', value: 'spam' },
   { label: 'Toxic / Profanity', value: 'toxic' },
   { label: 'Regex Pattern', value: 'pattern' },
-  { label: 'Sticker Pack', value: 'sticker' }
+  { label: 'Sticker Pack', value: 'sticker' },
+  { label: 'File Extension', value: 'file_ext' }
 ]
 
 const stickerTypeOptions = [

@@ -92,7 +92,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error logging chat history: {e}")
 
-    if not text:
+    if not text and not media_name and not message.sticker:
         return
 
     bot_username = context.bot.username or ""

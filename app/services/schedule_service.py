@@ -50,8 +50,8 @@ async def check_and_send_scheduled_messages(application: Application):
         if cron_expr and (not msg.get("sendAt") or msg.get("sendAt") == ""):
             try:
                 from croniter import croniter
-                from zoneinfo import ZoneInfo
-                base_time = datetime.now(ZoneInfo('Asia/Phnom_Penh'))
+                import pytz
+                base_time = datetime.now(pytz.timezone('Asia/Phnom_Penh'))
                 iter = croniter(cron_expr, base_time)
                 next_time = iter.get_next(datetime)
                 next_time_utc = next_time.astimezone(timezone.utc)
@@ -171,8 +171,8 @@ async def check_and_send_scheduled_messages(application: Application):
             if msg.get("cron"):
                 try:
                     from croniter import croniter
-                    from zoneinfo import ZoneInfo
-                    base_time = datetime.now(ZoneInfo('Asia/Phnom_Penh'))
+                    import pytz
+                    base_time = datetime.now(pytz.timezone('Asia/Phnom_Penh'))
                     iter = croniter(msg["cron"], base_time)
                     next_time = iter.get_next(datetime)
                     next_time_utc = next_time.astimezone(timezone.utc)

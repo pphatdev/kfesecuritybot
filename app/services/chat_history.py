@@ -3,7 +3,7 @@ import os
 import logging
 import time
 from datetime import datetime
-from zoneinfo import ZoneInfo
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def log_message(chat_id: int, message_id: int, sender_id: int, sender: str, text
     str_chat_id = str(chat_id)
     
     chat_list = data.get(str_chat_id, [])
-    now_str = datetime.now(ZoneInfo('Asia/Phnom_Penh')).strftime("%H:%M")
+    now_str = datetime.now(pytz.timezone('Asia/Phnom_Penh')).strftime("%H:%M")
     
     msg_entry = {
         "message_id": message_id,

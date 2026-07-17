@@ -2,7 +2,7 @@ import json
 import os
 import logging
 from datetime import datetime
-from zoneinfo import ZoneInfo
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def log_violation(user_id: int, username: str, reason: str, category: str, text:
     data['spam_toxic_blocked'] = data.get('spam_toxic_blocked', 0) + 1
     
     # Get current time
-    now_str = datetime.now(ZoneInfo('Asia/Phnom_Penh')).strftime("%H:%M")
+    now_str = datetime.now(pytz.timezone('Asia/Phnom_Penh')).strftime("%H:%M")
     
     # Update recent activity (keep last 50)
     activity = {
@@ -81,7 +81,7 @@ def log_violation(user_id: int, username: str, reason: str, category: str, text:
 
 def log_system_action(text: str):
     data = load_stats()
-    now_str = datetime.now(ZoneInfo('Asia/Phnom_Penh')).strftime("%H:%M")
+    now_str = datetime.now(pytz.timezone('Asia/Phnom_Penh')).strftime("%H:%M")
     
     activity = {
         "time": now_str,

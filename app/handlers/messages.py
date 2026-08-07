@@ -5,7 +5,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest, Forbidden
 from app.services.keywords import pre_check
-from app.handlers.commands import _bot_intro_html, _intro_keyboard
+from app.handlers.commands import _bot_intro_html, _intro_keyboard, ASK_QUESTION_PROMPT
+from app.services.qa_service import ask_gemini
 from app.services.stats import increment_scanned, log_violation, get_user_strikes
 from app.services.users_db import track_user
 from app.services.groups_db import track_group
@@ -32,6 +33,29 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 # In-memory dictionary to track user's last message time per chat
 # Format: {(chat_id, user_id): timestamp_in_seconds}
 user_last_message = {}
+
+# Tracks users who tapped "Ask Question" — the next message from that user
+# (in the same chat) within the TTL is treated as their question.
+# Format: {(chat_id, user_id): expiry_timestamp}
+pending_questions: dict[tuple[int, int], float] = {}
+PENDING_QUESTION_TTL_SECONDS = 300  # 5 minutes
+
+
+def mark_pending_question(chat_id: int, user_id: int) -> None:
+    pending_questions[(chat_id, user_id)] = time.time() + PENDING_QUESTION_TTL_SECONDS
+
+
+def _consume_pending_question(chat_id: int, user_id: int) -> bool:
+    """Return True (and clear the flag) if this user has an active pending-question slot."""
+    key = (chat_id, user_id)
+    expiry = pending_questions.get(key)
+    if not expiry:
+        return False
+    if expiry < time.time():
+        pending_questions.pop(key, None)
+        return False
+    pending_questions.pop(key, None)
+    return True
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process incoming messages. Handles mentions, keyword filter, and AI detection."""
@@ -154,6 +178,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = "Unknown"
         
     logger.info(f"Received message from @{username}: {text[:80]}")
+
+    # --- 6a. Ask Question flow ---
+    # Route to Gemini if either:
+    #   (a) the user is explicitly replying to our "Ask Question" prompt, or
+    #   (b) the user tapped "Ask Question" recently and this is their next
+    #       message in the same chat (pending_questions bookkeeping).
+    is_ask_reply = bool(
+        message.reply_to_message
+        and message.reply_to_message.from_user
+        and message.reply_to_message.from_user.id == context.bot.id
+        and (message.reply_to_message.text or "").strip() == ASK_QUESTION_PROMPT
+    )
+    has_pending = bool(
+        message.from_user
+        and message.chat
+        and _consume_pending_question(message.chat.id, message.from_user.id)
+    )
+    if is_ask_reply or has_pending:
+        question = text
+        logger.info(
+            f"Ask-Question from @{username} "
+            f"(via {'reply' if is_ask_reply else 'pending-slot'}): {question[:120]}"
+        )
+        await message.chat.send_action(action="typing")
+        answer = await ask_gemini(question)
+        try:
+            await message.reply_text(answer, disable_web_page_preview=True)
+        except Exception as e:
+            logger.error(f"Failed to send Q&A answer: {e}")
+        return
 
     # It counts as a "mention" if:
     # 1. The bot's username is in the text

@@ -25,8 +25,7 @@ from app.handlers.commands import (
     start_command,
     help_command,
     hi_command,
-    what_i_can_do_callback,
-    WHAT_I_CAN_DO_CALLBACK,
+    ask_question_callback,
 )
 from app.handlers.messages import handle_message, handle_my_chat_member
 from app.handlers.admin import adduser_command, removeuser_command
@@ -70,10 +69,11 @@ def main() -> None:
     application.add_handler(CommandHandler("removeuser", removeuser_command))
     application.add_handler(CommandHandler("deleteuser", removeuser_command))
 
-    # Inline button callbacks
-    application.add_handler(
-        CallbackQueryHandler(what_i_can_do_callback, pattern=f"^{WHAT_I_CAN_DO_CALLBACK}$")
-    )
+    # Single CallbackQueryHandler with no pattern — this bot only emits one
+    # kind of button ("Ask Question"), so any callback should route here.
+    # Matching without a pattern also catches messages carrying the older
+    # `what_i_can_do` callback data emitted before the rename.
+    application.add_handler(CallbackQueryHandler(ask_question_callback))
 
     # Message handlers — handle_message also handles mention replies internally
     application.add_handler(MessageHandler((filters.ALL | filters.UpdateType.CHANNEL_POST) & ~filters.COMMAND, handle_message))
@@ -81,7 +81,9 @@ def main() -> None:
 
     logger.info("Bot is starting. Press Ctrl+C to stop.")
 
-    application.run_polling()
+    # Explicitly request every update type — otherwise `my_chat_member` and
+    # (in some deployments) `callback_query` are silently excluded.
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()

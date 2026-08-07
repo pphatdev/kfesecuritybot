@@ -1,18 +1,28 @@
 import logging
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from app.services.users_db import track_user
 
 logger = logging.getLogger(__name__)
 
-WHAT_I_CAN_DO_CALLBACK = "what_i_can_do"
+ASK_QUESTION_CALLBACK = "ask_question"
+# Older messages emitted a button with this callback_data. Keep matching it so
+# users tapping pre-rename buttons still get a response.
+LEGACY_WHAT_I_CAN_DO_CALLBACK = "what_i_can_do"
+
+# Sent verbatim to the user after they tap "Ask Question". `handle_message`
+# looks for this exact text in `reply_to_message.text` to route the follow-up
+# reply through Gemini instead of the mention responder.
+ASK_QUESTION_PROMPT = (
+    "❓ Reply to this message with your question, and I'll ask Google for the answer."
+)
 
 
 def _intro_keyboard() -> InlineKeyboardMarkup:
     """Inline keyboard shown alongside the intro message."""
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(text="ℹ️ What I can do", callback_data=WHAT_I_CAN_DO_CALLBACK)]]
+        [[InlineKeyboardButton(text="❓ Ask Question", callback_data=ASK_QUESTION_CALLBACK)]]
     )
 
 
@@ -44,17 +54,6 @@ def _bot_intro_html(user_mention: str) -> str:
     )
 
 
-def _what_i_can_do_html() -> str:
-    """Detailed capability list shown when the 'What I can do' button is pressed."""
-    return (
-        "🤖 <b>What I can do</b>\n\n"
-        "• 🛡️ Auto-delete <b>spam</b>, <b>toxic</b>, and pattern-matched messages\n"
-        "• 🚫 Block banned <b>stickers</b> and sticker packs\n"
-        "• ⏱️ Enforce per-group <b>slow mode</b>\n"
-        "• 📊 Track violations and user <b>strikes</b>\n"
-        "• 📣 Deliver scheduled <b>broadcasts</b> from the dashboard\n\n"
-        "Type /help for a shorter summary or /start to see the intro again."
-    )
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -97,21 +96,70 @@ async def hi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def what_i_can_do_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle the 'What I can do' inline button press."""
+async def ask_question_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the 'Ask Question' inline button press.
+
+    Two-step feedback so the user always sees *something*:
+      1) Modal popup via `query.answer(show_alert=True)` — instant, works even
+         if the bot has restricted send rights in the chat.
+      2) A regular chat message with `ForceReply` so the user can type their
+         question and `handle_message` routes it to Gemini.
+    """
     query = update.callback_query
-    logger.info(f"what_i_can_do_callback fired: data={query.data if query else None!r}")
     if not query:
+        logger.warning("ask_question_callback: update has no callback_query")
         return
-    await query.answer()
+
+    logger.info(
+        f"ask_question_callback fired: data={query.data!r}, "
+        f"from_user={query.from_user.id if query.from_user else None}, "
+        f"chat_id={query.message.chat.id if query.message and query.message.chat else None}"
+    )
+
+    # Step 1: modal popup — guaranteed visible even in restricted groups.
     try:
-        await query.message.reply_html(_what_i_can_do_html())
+        await query.answer(
+            text="Reply to my next message with your question — I'll ask Google for you.",
+            show_alert=True,
+        )
     except Exception as e:
-        logger.warning(f"what_i_can_do_callback: reply_html failed ({e}), falling back to edit")
+        logger.warning(f"ask_question_callback: query.answer() failed: {e}")
+
+    # Step 2: send the follow-up message with ForceReply so the user's next
+    # message becomes a reply we can identify in handle_message.
+    chat_id = None
+    if query.message and query.message.chat:
+        chat_id = query.message.chat.id
+    elif query.from_user:
+        chat_id = query.from_user.id
+
+    if chat_id is None:
+        logger.error("ask_question_callback: no chat_id available, cannot send prompt")
+        return
+
+    # Flag this user so their next message in this chat is treated as their
+    # question, even if they don't tap the reply UI.
+    if query.from_user:
         try:
-            await query.edit_message_text(
-                text=_what_i_can_do_html(),
-                parse_mode="HTML",
+            from app.handlers.messages import mark_pending_question
+            mark_pending_question(chat_id, query.from_user.id)
+            logger.info(
+                f"ask_question_callback: pending-question slot marked for "
+                f"user={query.from_user.id} in chat={chat_id}"
             )
-        except Exception as e2:
-            logger.error(f"what_i_can_do_callback: edit fallback also failed: {e2}")
+        except Exception as e:
+            logger.warning(f"ask_question_callback: could not mark pending question: {e}")
+
+    force_reply = ForceReply(selective=True, input_field_placeholder="Type your question…")
+
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat_id,
+            text=ASK_QUESTION_PROMPT,
+            reply_markup=force_reply,
+        )
+        logger.info(
+            f"ask_question_callback: prompt sent — chat_id={chat_id}, message_id={sent.message_id}"
+        )
+    except Exception as e:
+        logger.error(f"ask_question_callback: send_message to {chat_id} failed: {e}")

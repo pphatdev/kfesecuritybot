@@ -12,9 +12,22 @@ httpx.AsyncClient.__init__ = _patched_httpx_init
 import logging
 import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ChatMemberHandler, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ChatMemberHandler,
+    CallbackQueryHandler,
+    filters,
+)
 from app.config import config
-from app.handlers.commands import start_command, help_command
+from app.handlers.commands import (
+    start_command,
+    help_command,
+    hi_command,
+    what_i_can_do_callback,
+    WHAT_I_CAN_DO_CALLBACK,
+)
 from app.handlers.messages import handle_message, handle_my_chat_member
 from app.handlers.admin import adduser_command, removeuser_command
 from app.services.schedule_service import run_scheduler
@@ -50,11 +63,17 @@ def main() -> None:
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler(["hi", "hello"], hi_command))
 
     # Admin commands (dashboard access management)
     application.add_handler(CommandHandler("adduser", adduser_command))
     application.add_handler(CommandHandler("removeuser", removeuser_command))
     application.add_handler(CommandHandler("deleteuser", removeuser_command))
+
+    # Inline button callbacks
+    application.add_handler(
+        CallbackQueryHandler(what_i_can_do_callback, pattern=f"^{WHAT_I_CAN_DO_CALLBACK}$")
+    )
 
     # Message handlers — handle_message also handles mention replies internally
     application.add_handler(MessageHandler((filters.ALL | filters.UpdateType.CHANNEL_POST) & ~filters.COMMAND, handle_message))

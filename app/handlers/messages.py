@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest, Forbidden
 from app.services.keywords import pre_check
-from app.handlers.commands import _bot_intro_html
+from app.handlers.commands import _bot_intro_html, _intro_keyboard
 from app.services.stats import increment_scanned, log_violation, get_user_strikes
 from app.services.users_db import track_user
 from app.services.groups_db import track_group
@@ -158,13 +158,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # It counts as a "mention" if:
     # 1. The bot's username is in the text
     # 2. The user is replying directly to one of the bot's messages
-    # 3. The message is just a simple greeting like "hi", "hello", "yoo"
+    # 3. The message is a bare greeting AND we're in a private chat
+    #    (bare greetings in groups/channels are ignored to avoid noise)
+    is_private_chat = bool(message.chat and message.chat.type == "private")
     is_mentioned = False
     if bot_username and f"@{bot_username}".lower() in text_lower:
         is_mentioned = True
-    elif message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
+    elif message.reply_to_message and message.reply_to_message.from_user and message.reply_to_message.from_user.id == context.bot.id:
         is_mentioned = True
-    elif text_lower in ["hi", "hello", "yoo", "hey", "សួស្តី", "សួរស្ដី"]:
+    elif is_private_chat and text_lower in ["hi", "hello", "yoo", "hey", "សួស្តី", "សួរស្ដី"]:
         is_mentioned = True
 
     if is_mentioned:
@@ -223,7 +225,10 @@ async def _reply_mention(message):
     user = message.from_user
     try:
         reply_html_content = _bot_intro_html(user.mention_html())
-        sent_message = await message.reply_html(reply_html_content)
+        sent_message = await message.reply_html(
+            reply_html_content,
+            reply_markup=_intro_keyboard(),
+        )
         logger.info(f"Mention reply sent to {user.first_name}.")
     except Exception as e:
         logger.error(f"Failed to send mention reply to {user.first_name}: {e}")

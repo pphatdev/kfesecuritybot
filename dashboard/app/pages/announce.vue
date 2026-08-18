@@ -243,14 +243,14 @@
                 </div>
 
                 <!-- Message History list bubbles -->
-                <div 
-                  v-for="msg in chatHistory" 
-                  :key="msg.message_id" 
-                  class="flex items-start gap-3 w-full mx-auto text-left"
+                <div
+                  v-for="msg in chatHistory"
+                  :key="msg.message_id"
+                  class="flex items-start gap-3 w-full mx-auto text-left group/msg"
                   :class="msg.is_bot ? 'flex-row-reverse text-right' : 'flex-row'"
                 >
                   <!-- Avatar -->
-                  <div 
+                  <div
                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm text-xs border animate-fade-in"
                     :class="msg.is_bot ? 'bg-primary text-white border-primary/20' : 'bg-slate-700 text-slate-100 border-slate-600'"
                   >
@@ -266,16 +266,18 @@
                       <span v-if="msg.is_bot" class="text-[8px] text-slate-500 font-medium">bot</span>
                     </div>
 
-                    <!-- Bubble Body -->
-                    <div 
-                      class="border rounded-2xl p-3 shadow-md text-xs relative max-w-md inline-block text-left"
-                      :class="[
-                        msg.is_bot 
-                          ? 'bg-[#17212b] border-[#2b5278]/20 text-slate-100 rounded-tr-none' 
-                          : 'bg-[#182533] border-slate-700/30 text-slate-200 rounded-tl-none',
-                        msg.is_deleted ? 'opacity-60 italic bg-red-950/20 border-red-500/20' : ''
-                      ]"
-                    >
+                    <!-- Bubble + Actions Row -->
+                    <div class="inline-flex items-center gap-1.5 max-w-full" :class="msg.is_bot ? 'flex-row-reverse' : 'flex-row'">
+                      <!-- Bubble Body -->
+                      <div
+                        class="border rounded-2xl p-3 shadow-md text-xs relative max-w-md text-left"
+                        :class="[
+                          msg.is_bot
+                            ? 'bg-[#17212b] border-[#2b5278]/20 text-slate-100 rounded-tr-none'
+                            : 'bg-[#182533] border-slate-700/30 text-slate-200 rounded-tl-none',
+                          msg.is_deleted ? 'opacity-60 italic bg-red-950/20 border-red-500/20' : ''
+                        ]"
+                      >
                       <!-- Deleted Banner -->
                       <div v-if="msg.is_deleted" class="text-red-400 flex items-center gap-1.5">
                         <IconAlertCircle class="w-3.5 h-3.5 shrink-0" />
@@ -314,11 +316,59 @@
                       <div class="text-[8px] text-slate-500 mt-1 text-right font-mono select-none">
                         {{ msg.time }}
                       </div>
+                      </div>
+
+                      <!-- Hover Actions (Reply + Delete) -->
+                      <div
+                        v-if="!msg.is_deleted"
+                        class="flex flex-col gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity shrink-0"
+                      >
+                        <button
+                          type="button"
+                          @click="startReply(msg)"
+                          class="w-6 h-6 rounded-full bg-[#182533] border border-slate-700/40 text-slate-400 hover:text-primary hover:border-primary/40 flex items-center justify-center transition-colors cursor-pointer"
+                          title="Reply to this message via bot"
+                        >
+                          <IconArrowBackUp class="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          @click="handleDeleteMessage(msg)"
+                          :disabled="deletingMessageIds.includes(msg.message_id)"
+                          class="w-6 h-6 rounded-full bg-[#182533] border border-slate-700/40 text-slate-400 hover:text-danger hover:border-danger/40 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete this message from Telegram"
+                        >
+                          <IconLoader v-if="deletingMessageIds.includes(msg.message_id)" class="w-3.5 h-3.5 animate-spin" />
+                          <IconTrash v-else class="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
+            </div>
+
+            <!-- Reply Target Indicator -->
+            <div
+              v-if="replyTo"
+              class="px-4 pt-2 pb-1 bg-[#17212b]/85 backdrop-blur-md border-t border-[#101921]/80 shrink-0 flex items-center gap-3 select-none z-10"
+            >
+              <div class="flex items-center gap-2 flex-1 min-w-0 border-l-2 border-primary/60 pl-2.5 py-1 bg-primary-subtle/10 rounded-r">
+                <IconArrowBackUp class="w-3.5 h-3.5 text-primary shrink-0" />
+                <div class="flex flex-col min-w-0">
+                  <span class="text-[10px] font-semibold text-primary">Replying to {{ replyTo.sender }}</span>
+                  <span class="text-[11px] text-slate-300 truncate">{{ stripHtml(replyTo.text) || (replyTo.sticker_id ? '[Sticker]' : replyTo.media_name ? `[${replyTo.media_name}]` : '') }}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="cancelReply"
+                class="w-7 h-7 rounded-full bg-slate-500/10 text-slate-400 hover:text-white hover:bg-slate-500/20 flex items-center justify-center shrink-0 cursor-pointer"
+                title="Cancel reply"
+              >
+                <IconX class="w-3.5 h-3.5" />
+              </button>
             </div>
 
             <!-- Bottom Composer Input Bar (The Telegram Input area) -->
@@ -1059,7 +1109,8 @@ import {
   IconPlus,
   IconMoodSmile,
   IconArrowsMaximize,
-  IconArrowsMinimize
+  IconArrowsMinimize,
+  IconArrowBackUp
 } from '@tabler/icons-vue'
 
 const message = ref('')
@@ -1086,6 +1137,49 @@ const triggerToast = (msg, type = 'success') => {
 const chatHistory = ref([])
 const loadingHistory = ref(false)
 const chatScrollContainer = ref(null)
+const replyTo = ref(null)
+const deletingMessageIds = ref([])
+
+const startReply = (msg) => {
+  if (!msg) return
+  replyTo.value = msg
+  composeMode.value = 'text'
+  nextTick(() => {
+    const textarea = document.querySelector('textarea[placeholder^="Write a message"]')
+    if (textarea) textarea.focus()
+  })
+}
+
+const cancelReply = () => {
+  replyTo.value = null
+}
+
+const handleDeleteMessage = async (msg) => {
+  if (!msg || !activeChatId.value) return
+  const confirmed = await showConfirmModal(
+    'Delete this message?',
+    'This will remove the message from Telegram (if within 48 hours) and mark it as removed here.',
+    'danger'
+  )
+  if (!confirmed) return
+
+  deletingMessageIds.value = [...deletingMessageIds.value, msg.message_id]
+  try {
+    await $fetch('/api/chats/message', {
+      method: 'DELETE',
+      body: { chat_id: activeChatId.value, message_id: msg.message_id }
+    })
+    if (replyTo.value && replyTo.value.message_id === msg.message_id) {
+      cancelReply()
+    }
+    triggerToast('Message deleted.', 'success')
+    await fetchChatHistory()
+  } catch (err) {
+    triggerToast(err.data?.statusMessage || err.message || 'Failed to delete message.', 'error')
+  } finally {
+    deletingMessageIds.value = deletingMessageIds.value.filter(id => id !== msg.message_id)
+  }
+}
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -1134,6 +1228,7 @@ const fetchChatHistory = async () => {
 
 watch(activeChatId, (newId) => {
   fetchChatHistory()
+  if (replyTo.value) cancelReply()
   if (newId) {
     currentMobileView.value = 'chat'
   } else {
@@ -1967,6 +2062,37 @@ const reuseMessage = async (schedule) => {
 }
 
 const sendAnnouncement = async () => {
+  // Reply path: text-only, single-chat, immediate send
+  if (replyTo.value && activeTab.value === 'send') {
+    if (composeMode.value !== 'text' || attachedFile.value) {
+      triggerToast('Replies support text only. Remove the attachment or cancel the reply.', 'error')
+      return
+    }
+    if (!message.value.trim() || !activeChatId.value) return
+    error.value = ''
+    success.value = ''
+    sending.value = true
+    try {
+      await $fetch('/api/chats/reply', {
+        method: 'POST',
+        body: {
+          chat_id: activeChatId.value,
+          reply_to_message_id: replyTo.value.message_id,
+          text: message.value
+        }
+      })
+      if (!isTemplateUsed.value) message.value = ''
+      cancelReply()
+      triggerToast('Reply sent.', 'success')
+      await fetchChatHistory()
+    } catch (err) {
+      error.value = err.data?.statusMessage || err.message || 'Failed to send reply.'
+    } finally {
+      sending.value = false
+    }
+    return
+  }
+
   if (composeMode.value === 'sticker') {
     if (!selectedStickerId.value || selectedGroups.value.length === 0) return
   } else {
@@ -1976,7 +2102,7 @@ const sendAnnouncement = async () => {
     if (scheduleType.value === 'once' && !scheduleTime.value) return
     if (scheduleType.value === 'recurring' && !cronExpression.value.trim()) return
   }
-  
+
   error.value = ''
   success.value = ''
   sending.value = true
